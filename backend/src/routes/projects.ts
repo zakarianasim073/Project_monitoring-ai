@@ -1,34 +1,167 @@
 import express from 'express';
 import { protect, requireProjectRole } from '../middleware/auth';
-import { Project } from '../models/Project';
-import { ProjectMember } from '../models/ProjectMember';
+
+// Controllers
 import dprController from '../controllers/dprController';
 import billController from '../controllers/billController';
-// ... other controllers
+import inventoryController from '../controllers/inventoryController';
+
+// Gemini service for AI features
+import geminiService from '../services/geminiService';
 
 const router = express.Router();
 
+// ====================== PUBLIC PROJECT LIST ======================
 router.get('/my-projects', protect, async (req, res) => {
-  const members = await ProjectMember.find({ user: req.user._id }).populate('project');
-  res.json(members.map(m => ({
-    ...m.project.toObject(),
-    myRole: m.role
-  })));
+  try {
+    const { ProjectMember } = await import('../models/ProjectMember');
+    const members = await ProjectMember.find({ user: req.user._id })
+      .populate('project', 'name contractValue startDate endDate status priority');
+
+    const projects = members.map((m: any) => ({
+      ...m.project.toObject(),
+      myRole: m.role
+    }));
+
+    res.json(projects);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
+// ====================== SINGLE PROJECT (with role check) ======================
 router.get('/:projectId', protect, requireProjectRole(['DIRECTOR', 'MANAGER', 'ENGINEER', 'ACCOUNTANT']), async (req, res) => {
-  const project = await Project.findById(req.params.projectId)
-    .populate('boq dprs materials subContractors bills liabilities documents');
-  if (!project) return res.status(404).json({ error: 'Project not found' });
-  res.json(project);
+  try {
+    const { Project } = await import('../models/Project');
+    const project = await Project.findById(req.params.projectId)
+      .populate('boq')
+      .populate('dprs')
+      .populate('materials')
+      .populate('subContractors')
+      .populate('bills')
+      .populate('liabilities')
+      .populate('documents');
+
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+
+    res.json(project);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
-// DPR Routes
-router.post('/:projectId/dprs', protect, requireProjectRole(['ENGINEER', 'DIRECTOR']), dprController.createDPR);
+// ====================== DPR ROUTES ======================
+router.post(
+  '/:projectId/dprs', 
+  protect, 
+  requireProjectRole(['ENGINEER', 'DIRECTOR']), 
+  dprController.createDPR
+);
 
-// Bill Routes
-router.post('/:projectId/bills', protect, requireProjectRole(['MANAGER', 'ACCOUNTANT', 'DIRECTOR']), billController.createBill);
+// ====================== BILL ROUTES ======================
+router.post(
+  '/:projectId/bills', 
+  protect, 
+  requireProjectRole(['MANAGER', 'ACCOUNTANT', 'DIRECTOR']), 
+  billController.createBill
+);
 
-// Add more routes for materials, documents, remarks, etc.
+// ====================== INVENTORY / MATERIAL ROUTES ======================
+router.post(
+  '/:projectId/materials/receive', 
+  protect, 
+  requireProjectRole(['ENGINEER', 'MANAGER', 'DIRECTOR']), 
+  inventoryController.receiveMaterial
+);
+
+// ====================== PD REMARKS (Director only) ======================
+router.patch(
+  '/:projectId/remarks', 
+  protect, 
+  requireProjectRole(['DIRECTOR']), 
+  inventoryController.updatePDRemarks
+);
+
+// ====================== DOCUMENT ROUTES ======================
+router.post(
+  '/:projectId/documents', 
+  protect, 
+  requireProjectRole(['ENGINEER', 'MANAGER', 'DIRECTOR', 'ACCOUNTANT']), 
+  async (req, res) => {
+    try {
+      const { ProjectDocument } = await import('../models/ProjectDocument');
+      const { Project } = await import('../models/Project');
+
+      const newDoc = new ProjectDocument({
+        ...req.body,
+        project: req.params.projectId,
+        uploadDate: new Date().toISOString().split('T')[0]
+      });
+
+      await newDoc.save();
+
+      const project = await Project.findById(req.params.projectId);
+      if (project) {
+        project.documents.push(newDoc._id);
+        await project.save();
+      }
+
+      res.status(201).json(newDoc);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
+// ====================== AI FEATURES ======================
+// AI Auto-fill for DPR (used by SiteExecution)
+router.post(
+  '/:projectId/ai/extract-dpr', 
+  protect, 
+  requireProjectRole(['ENGINEER', 'DIRECTOR']), 
+  async (req, res) => {
+    try {
+      const { documentName, boqItems } = req.body;
+      const extracted = await geminiService.extractDPRData(documentName, boqItems);
+      res.json(extracted);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
+// AI Project Insights (used by Dashboard)
+router.post(
+  '/:projectId/ai/insights', 
+  protect, 
+  async (req, res) => {
+    try {
+      const { Project } = await import('../models/Project');
+      const project = await Project.findById(req.params.projectId);
+      if (!project) return res.status(404).json({ error: 'Project not found' });
+
+      const insight = await geminiService.generateProjectInsights(project);
+      res.json({ insight });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
+// AI Bill Extraction
+router.post(
+  '/:projectId/ai/extract-bill', 
+  protect, 
+  requireProjectRole(['MANAGER', 'ACCOUNTANT', 'DIRECTOR']), 
+  async (req, res) => {
+    try {
+      const { documentName } = req.body;
+      const extracted = await geminiService.extractBillData(documentName);
+      res.json(extracted);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
 
 export default router;
