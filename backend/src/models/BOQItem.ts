@@ -12,13 +12,17 @@ const BOQItemSchema = new mongoose.Schema({
   billedAmount: { type: Number, default: 0 },
 
   costAnalysis: {
-    unitCost: Number,
-    breakdown: {
-      material: { type: Number, default: 0 },
-      labor: { type: Number, default: 0 },
-      equipment: { type: Number, default: 0 },
-      overhead: { type: Number, default: 0 }
-    }
+  unitCost: Number,                    // Total actual unit cost
+  breakdown: {
+    material: { type: Number, default: 0 },
+    labor: { type: Number, default: 0 },
+    equipment: { type: Number, default: 0 },
+    overhead: { type: Number, default: 0 }
+  },
+  govtDeductionRate: { type: Number, default: 14.5 },   // 14.5% on quoted rate
+  govtDeductionAmount: Number,
+  profitPerUnit: Number,
+  totalProfitLoss: Number
   }
 }, { timestamps: true });
 
