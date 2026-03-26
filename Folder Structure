@@ -1,0 +1,26 @@
+buildtrack-ai/
+├── frontend/                  ← Your React app
+│   ├── src/
+│   │   ├── components/        ← Paste your original + new Login.tsx
+│   │   ├── types.ts
+│   │   ├── services/api.ts    ← NEW
+│   │   ├── App.tsx            ← Updated
+│   │   └── main.tsx
+│   ├── package.json
+│   └── .env.example
+│
+├── backend/                   ← NEW Node backend
+│   ├── src/
+│   │   ├── config/
+│   │   ├── models/
+│   │   ├── middleware/
+│   │   ├── routes/
+│   │   ├── controllers/
+│   │   ├── services/
+│   │   └── server.ts
+│   ├── package.json
+│   └── .env.example
+│
+├── docker-compose.yml
+├── README.md
+└── .gitignore
