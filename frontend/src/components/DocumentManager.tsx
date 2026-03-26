@@ -3,6 +3,24 @@ import { ProjectDocument } from '../types';
 import { FileText, Image, File, Search, UploadCloud, Download, X, Sparkles, Loader2 } from 'lucide-react';
 import { api } from '../services/api';
 
+// Inside DocumentManager component
+<button 
+  onClick={() => setShowSmartUpload(true)}
+  className="flex items-center gap-2 bg-emerald-600 text-white px-5 py-2.5 rounded-2xl text-sm font-medium"
+>
+  <Sparkles className="w-4 h-4" /> Smart Import (PDF/Excel/Word)
+</button>
+
+// Add this modal
+{showSmartUpload && (
+  <SmartUploadModal 
+    projectId={projectId!}
+    isOpen={showSmartUpload}
+    onClose={() => setShowSmartUpload(false)}
+    onSuccess={() => window.location.reload()}
+  />
+)}
+
 interface DocumentManagerProps {
   documents: ProjectDocument[];
   onAddDocument: (doc: ProjectDocument) => void;
