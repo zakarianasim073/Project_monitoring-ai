@@ -4,132 +4,112 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-const model = genAI.getGenerativeModel({ 
-  model: "gemini-1.5-flash",
-  generationConfig: {
-    temperature: 0.7,
-    maxOutputTokens: 2048,
-  }
-});
-
-// ==================== DPR EXTRACTION ====================
-export const extractDPRData = async (documentName: string, boqItems: any[]) => {
+// Universal Deep Scan Engine
+export const deepScanDocument = async (fileName: string, fileType: string, projectContext?: any) => {
   try {
-    const prompt = `
-      You are an expert construction site engineer. 
-      Analyze the daily progress report document named "${documentName}".
-      
-      Extract the following information in clean JSON format only:
-      {
-        "date": "YYYY-MM-DD",
-        "activity": "short description of work done",
-        "location": "chainage or location",
-        "laborCount": number,
-        "remarks": "any issues or notes",
-        "linkedBoqId": "exact BOQ ID if mentioned, otherwise null",
-        "workDoneQty": number or null,
-        "subContractorName": "name of subcontractor if any",
-        "materials": [
-          { "name": "material name", "qty": number }
-        ]
-      }
+    let prompt = "";
 
-      BOQ Items for reference:
-      ${JSON.stringify(boqItems.slice(0, 15), null, 2)}
+    if (fileType === "application/pdf" || fileName.endsWith('.pdf')) {
+      prompt = `
+        This is a BWDB construction document. 
+        Analyze and return structured JSON only.
+        Detect document type and extract all data:
 
-      Return ONLY valid JSON. No explanation.
-    `;
+        Possible types: BOQ, DPR, BILL, MATERIAL_LIST, CONTRACT
 
-    const result = await model.generateContent(prompt);
-    const responseText = result.response.text().trim();
-
-    // Clean JSON response
-    let cleaned = responseText.replace(/```json|```/g, '').trim();
-    const extracted = JSON.parse(cleaned);
-
-    return extracted;
-  } catch (error) {
-    console.error("Gemini DPR Extraction Error:", error);
-    return null;
-  }
-};
-
-// ==================== BILL EXTRACTION ====================
-export const extractBillData = async (documentName: string) => {
-  try {
-    const prompt = `
-      Extract bill/invoice information from document "${documentName}".
-      Return ONLY JSON:
-      {
-        "type": "CLIENT_RA" or "VENDOR_INVOICE",
-        "entityName": "company or client name",
-        "amount": number,
-        "date": "YYYY-MM-DD",
-        "description": "brief description"
-      }
-    `;
+        Return JSON:
+        {
+          "documentType": "BOQ" | "DPR" | "BILL" | "MATERIAL" | "CONTRACT",
+          "projectName": "...",
+          "totalAmount": number,
+          "items": [array of items with description, qty, unit, rate, amount],
+          "date": "YYYY-MM-DD",
+          "remarks": "..."
+        }
+      `;
+    } 
+    else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+      prompt = `This is an Excel file. Extract all tables as structured data. Especially look for BOQ tables with columns: Item No, Description, Quantity, Unit, Rate, Amount.`;
+    } 
+    else if (fileName.endsWith('.docx')) {
+      prompt = `This is a Word document. Extract all structured content, especially any BOQ, bill, or progress report tables.`;
+    }
 
     const result = await model.generateContent(prompt);
     const text = result.response.text().trim();
     const cleaned = text.replace(/```json|```/g, '').trim();
+    
     return JSON.parse(cleaned);
   } catch (error) {
-    console.error("Gemini Bill Extraction Error:", error);
+    console.error("Deep Scan Error:", error);
     return null;
   }
 };
 
-// ==================== PROJECT INSIGHTS ====================
-export const generateProjectInsights = async (projectData: any) => {
-  try {
-    const prompt = `
-      You are a senior construction project management consultant.
-      Analyze this project data and give a professional insight report (max 400 words).
+// Smart Auto Placement Engine
+export const autoPlaceDocumentData = async (parsedData: any, projectId: string) => {
+  const { Project } = await import('../models/Project');
+  const project = await Project.findById(projectId);
 
-      Project: ${projectData.name}
-      Progress: ${Math.round((projectData.boq.reduce((a: number, b: any) => a + b.executedQty * b.rate, 0) / projectData.boq.reduce((a: number, b: any) => a + b.plannedQty * b.rate, 0)) * 100)}%
-      Key Issues: ${projectData.dprs?.slice(-3).map((d: any) => d.remarks).join(', ') || 'None'}
+  if (!project || !parsedData) return { success: false };
 
-      Provide actionable insights in markdown format.
-    `;
-
-    const result = await model.generateContent(prompt);
-    return result.response.text();
-  } catch (error) {
-    console.error("Gemini Insights Error:", error);
-    return "AI analysis temporarily unavailable.";
-  }
-};
-
-// ==================== COST BREAKDOWN SUGGESTION ====================
-export const suggestActualCostBreakdown = async (description: string, totalUnitCost: number, plannedBreakdown?: any) => {
-  try {
-    const prompt = `
-      Suggest realistic cost breakdown for "${description}" with total unit cost ${totalUnitCost} BDT.
-      Return only JSON:
-      {
-        "material": number,
-        "labor": number,
-        "equipment": number,
-        "overhead": number
+  switch (parsedData.documentType) {
+    case "BOQ":
+      // Create BOQ items
+      for (const item of parsedData.items || []) {
+        const boqItem = new (await import('../models/BOQItem')).BOQItem({
+          project: projectId,
+          id: item.itemCode || `BOQ-${Date.now()}`,
+          description: item.description,
+          plannedQty: item.quantity,
+          unit: item.unit,
+          rate: item.quotedRate || item.rate,
+          executedQty: 0
+        });
+        await boqItem.save();
+        project.boq.push(boqItem._id);
       }
-      Sum must equal exactly ${totalUnitCost}.
-    `;
+      project.contractValue = parsedData.totalAmount || project.contractValue;
+      break;
 
-    const result = await model.generateContent(prompt);
-    const text = result.response.text().trim();
-    const cleaned = text.replace(/```json|```/g, '').trim();
-    return JSON.parse(cleaned);
-  } catch (error) {
-    console.error("Gemini Cost Breakdown Error:", error);
-    return null;
+    case "DPR":
+      // Auto create DPR + trigger automation
+      const dprController = await import('../controllers/dprController');
+      await dprController.createDPR({ body: parsedData, params: { projectId } } as any, {} as any);
+      break;
+
+    case "BILL":
+      const billController = await import('../controllers/billController');
+      await billController.createBill({ body: parsedData, params: { projectId } } as any, {} as any);
+      break;
+
+    case "MATERIAL":
+      // Auto add materials to inventory
+      for (const mat of parsedData.items || []) {
+        const material = new (await import('../models/Material')).Material({
+          project: projectId,
+          name: mat.name,
+          unit: mat.unit,
+          totalReceived: mat.quantity || 0,
+          currentStock: mat.quantity || 0,
+          averageRate: mat.rate || 0
+        });
+        await material.save();
+        project.materials.push(material._id);
+      }
+      break;
   }
+
+  await project.save();
+  return { success: true, documentType: parsedData.documentType };
 };
 
 export default {
-  extractDPRData,
-  extractBillData,
-  generateProjectInsights,
-  suggestActualCostBreakdown
+  deepScanDocument,
+  autoPlaceDocumentData,
+  // keep your previous functions too
+  extractDPRData: async (...) => { ... },
+  extractBOQFromPDF: async (...) => { ... }
 };
