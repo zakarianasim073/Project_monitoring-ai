@@ -1,58 +1,60 @@
-import React, { useState } from 'react';
-import { useOutletContext } from 'react-router-dom';
-import { ProjectState, UserRole } from '../types';
-import { Download, PlusCircle, Sparkles, Loader2, Wallet, ArrowDownRight, Package, TrendingUp } from 'lucide-react';
-import { api } from '../services/api';
-import DocumentManager from './DocumentManager';
+{/* Item-wise Actual Cost Analysis with 14.5% Govt Deduction */}
+<div className="bg-white rounded-3xl border overflow-hidden">
+  <div className="px-8 py-6 border-b bg-slate-50 flex justify-between">
+    <h3 className="font-semibold text-xl">Item-wise Actual Costing & Profit/Loss</h3>
+    <span className="text-sm text-rose-600 font-medium">14.5% Govt Deduction Applied on Quoted Rate</span>
+  </div>
 
-const FinancialControl: React.FC = () => {
-  const { currentRole, projectId } = useOutletContext<{ currentRole: UserRole; projectId: string }>();
-  const [data, setData] = useState<ProjectState | null>(null);
+  <div className="overflow-x-auto">
+    <table className="w-full text-sm">
+      <thead className="bg-slate-50">
+        <tr>
+          <th className="px-6 py-4 text-left">Description</th>
+          <th className="px-6 py-4 text-right">Quoted Rate</th>
+          <th className="px-6 py-4 text-right">Actual Cost (M+L+E+O)</th>
+          <th className="px-6 py-4 text-right text-rose-600">14.5% Govt Ded.</th>
+          <th className="px-6 py-4 text-right font-semibold">Final Actual Cost</th>
+          <th className="px-6 py-4 text-right">Profit/Loss per Unit</th>
+          <th className="px-6 py-4 text-right">Total P/L (Executed Qty)</th>
+          <th className="px-6 py-4 text-center">Action</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y">
+        {data.boq.map((item) => {
+          const analysis = item.costAnalysis || {};
+          const finalActual = analysis.unitCost || 0;
+          const govtDed = item.rate * 0.145;
+          const profitPerUnit = item.rate - finalActual;
+          const totalPL = profitPerUnit * item.executedQty;
 
-  const canAddClientBill = currentRole === 'MANAGER' || currentRole === 'DIRECTOR';
-  const canAddVendorBill = currentRole === 'ACCOUNTANT' || currentRole === 'DIRECTOR';
-
-  // ... your existing bill form state
-
-  const handleCreateBill = async (billData: any) => {
-    await api.addBill(projectId, billData);
-    alert('Bill recorded successfully!');
-  };
-
-  return (
-    <div className="space-y-8">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">Financial Control</h1>
-          <p className="text-slate-500">Role: {currentRole}</p>
-        </div>
-        <div className="flex gap-3">
-          {canAddVendorBill && (
-            <button onClick={() => { /* open modal */ }} className="flex items-center gap-2 bg-white border px-5 py-3 rounded-2xl">
-              <PlusCircle className="w-5 h-5" /> Add Expense
-            </button>
-          )}
-          {canAddClientBill && (
-            <button onClick={() => { /* open modal */ }} className="bg-blue-600 text-white px-6 py-3 rounded-2xl flex items-center gap-2">
-              Record Client Bill
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* KPI Cards - keep your original */}
-      {/* Unit Cost Table - keep your original but disable edit for Engineer */}
-      {/* Bill Tables */}
-
-      <DocumentManager 
-        documents={data?.documents || []} 
-        onAddDocument={(doc) => api.addDocument(projectId, doc)}
-        filterModule="FINANCE" 
-        compact={false}
-        allowUpload={canAddClientBill || canAddVendorBill}
-      />
-    </div>
-  );
-};
-
-export default FinancialControl;
+          return (
+            <tr key={item.id} className="hover:bg-slate-50">
+              <td className="px-6 py-4 font-medium">{item.description}</td>
+              <td className="px-6 py-4 text-right">৳{item.rate.toLocaleString()}</td>
+              <td className="px-6 py-4 text-right font-mono">
+                ৳{(analysis.breakdown?.material || 0) + (analysis.breakdown?.labor || 0) + 
+                   (analysis.breakdown?.equipment || 0) + (analysis.breakdown?.overhead || 0)}
+              </td>
+              <td className="px-6 py-4 text-right text-rose-600">৳{govtDed.toFixed(2)}</td>
+              <td className="px-6 py-4 text-right font-bold">৳{finalActual.toFixed(2)}</td>
+              <td className={`px-6 py-4 text-right font-bold ${profitPerUnit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                ৳{profitPerUnit.toFixed(2)}
+              </td>
+              <td className={`px-6 py-4 text-right font-bold ${totalPL >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                ৳{totalPL.toLocaleString()}
+              </td>
+              <td className="px-6 py-4 text-center">
+                <button 
+                  onClick={() => analyzeCost(item.id)}
+                  className="text-xs bg-indigo-100 text-indigo-700 px-4 py-1.5 rounded-full hover:bg-indigo-200"
+                >
+                  AI Analyze Cost
+                </button>
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  </div>
+</div>
