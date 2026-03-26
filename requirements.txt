@@ -1,5 +1,0 @@
-# Project_monitoring-ai meta requirements
-Node.js >= 18
-npm >= 9
-Docker >= 24
-MongoDB Atlas (or local MongoDB)
