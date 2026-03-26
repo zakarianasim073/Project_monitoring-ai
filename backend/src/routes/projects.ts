@@ -1,6 +1,32 @@
 import express from 'express';
 import { protect, requireProjectRole } from '../middleware/auth';
 
+// SMART DOCUMENT UPLOAD + AUTO PLACE
+router.post(
+  '/:projectId/documents/smart-upload', 
+  protect, 
+  requireProjectRole(['DIRECTOR', 'MANAGER', 'ENGINEER']), 
+  async (req, res) => {
+    try {
+      const { projectId } = req.params;
+      const { fileName, fileType } = req.body;   // frontend sends filename after upload
+
+      const parsed = await geminiService.deepScanDocument(fileName, fileType);
+      if (!parsed) return res.status(400).json({ error: "Failed to parse document" });
+
+      const result = await geminiService.autoPlaceDocumentData(parsed, projectId);
+
+      res.json({
+        success: true,
+        message: `Document smart-placed as ${parsed.documentType}`,
+        placedData: parsed
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
 // Controllers
 import dprController from '../controllers/dprController';
 import billController from '../controllers/billController';
