@@ -1,4 +1,9 @@
 {
+  "scripts": {
+  "build": "tsc",
+  "start": "node dist/server.js",
+  "dev": "ts-node src/server.ts"
+}
   "name": "buildtrack-backend",
   "version": "1.0.0",
   "scripts": {
