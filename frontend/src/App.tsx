@@ -1,26 +1,37 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Login from './components/Login';
 import ProjectList from './components/ProjectList';
 import Layout from './components/Layout';
-// Import all your other components: Dashboard, SiteExecution, etc.
+
+const queryClient = new QueryClient();
 
 function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('token'));
-
-  useEffect(() => {
-    setIsAuthenticated(!!localStorage.getItem('token'));
-  }, []);
+  const token = localStorage.getItem('token');
 
   return (
-    <Router>
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/projects" element={isAuthenticated ? <ProjectList /> : <Navigate to="/login" />} />
-        <Route path="/project/:projectId" element={isAuthenticated ? <Layout /> : <Navigate to="/login" />} />
-        <Route path="/" element={<Navigate to="/projects" />} />
-      </Routes>
-    </Router>
+    <QueryClientProvider client={queryClient}>
+      <Router>
+        <Routes>
+          {/* Public Route */}
+          <Route path="/login" element={!token ? <Login /> : <Navigate to="/projects" />} />
+
+          {/* Protected Routes */}
+          <Route 
+            path="/projects" 
+            element={token ? <ProjectList /> : <Navigate to="/login" />} 
+          />
+          
+          <Route 
+            path="/project/:projectId/*" 
+            element={token ? <Layout /> : <Navigate to="/login" />} 
+          />
+
+          {/* Redirect root */}
+          <Route path="/" element={<Navigate to={token ? "/projects" : "/login"} />} />
+        </Routes>
+      </Router>
+    </QueryClientProvider>
   );
 }
 
