@@ -26,6 +26,12 @@ router.post(
     }
   }
 );
+router.post(
+  '/:projectId/boq/:boqItemId/analyze-cost', 
+  protect, 
+  requireProjectRole(['DIRECTOR', 'MANAGER']), 
+  costingController.analyzeItemCost
+);
 
 // Controllers
 import dprController from '../controllers/dprController';
