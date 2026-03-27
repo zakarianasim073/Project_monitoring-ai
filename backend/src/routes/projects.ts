@@ -1,6 +1,17 @@
 import express from 'express';
 import { protect, requireProjectRole } from '../middleware/auth';
 
+// Controllers
+import dprController from '../controllers/dprController';
+import billController from '../controllers/billController';
+import inventoryController from '../controllers/inventoryController';
+import costingController from '../controllers/costingController';
+
+// Gemini service for AI features
+import geminiService from '../services/geminiService';
+
+const router = express.Router();
+
 // SMART DOCUMENT UPLOAD + AUTO PLACE
 router.post(
   '/:projectId/documents/smart-upload', 
@@ -9,7 +20,7 @@ router.post(
   async (req, res) => {
     try {
       const { projectId } = req.params;
-      const { fileName, fileType } = req.body;   // frontend sends filename after upload
+      const { fileName, fileType } = req.body;
 
       const parsed = await geminiService.deepScanDocument(fileName, fileType);
       if (!parsed) return res.status(400).json({ error: "Failed to parse document" });
@@ -26,6 +37,7 @@ router.post(
     }
   }
 );
+
 router.post(
   '/:projectId/boq/:boqItemId/analyze-cost', 
   protect, 
@@ -33,21 +45,11 @@ router.post(
   costingController.analyzeItemCost
 );
 
-// Controllers
-import dprController from '../controllers/dprController';
-import billController from '../controllers/billController';
-import inventoryController from '../controllers/inventoryController';
-
-// Gemini service for AI features
-import geminiService from '../services/geminiService';
-
-const router = express.Router();
-
 // ====================== PUBLIC PROJECT LIST ======================
 router.get('/my-projects', protect, async (req, res) => {
   try {
     const { ProjectMember } = await import('../models/ProjectMember');
-    const members = await ProjectMember.find({ user: req.user._id })
+    const members = await ProjectMember.find({ user: (req as any).user._id })
       .populate('project', 'name contractValue startDate endDate status priority');
 
     const projects = members.map((m: any) => ({
@@ -146,7 +148,6 @@ router.post(
 );
 
 // ====================== AI FEATURES ======================
-// AI Auto-fill for DPR (used by SiteExecution)
 router.post(
   '/:projectId/ai/extract-dpr', 
   protect, 
@@ -162,7 +163,6 @@ router.post(
   }
 );
 
-// AI Project Insights (used by Dashboard)
 router.post(
   '/:projectId/ai/insights', 
   protect, 
@@ -180,7 +180,6 @@ router.post(
   }
 );
 
-// AI Bill Extraction
 router.post(
   '/:projectId/ai/extract-bill', 
   protect, 

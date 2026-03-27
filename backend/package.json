@@ -1,15 +1,13 @@
 {
-  "scripts": {
-  "build": "tsc",
-  "start": "node dist/server.js",
-  "dev": "ts-node src/server.ts"
-}
   "name": "buildtrack-backend",
   "version": "1.0.0",
+  "description": "Backend for BuildTrack project monitoring",
+  "main": "dist/server.js",
   "scripts": {
     "dev": "nodemon src/server.ts",
     "build": "tsc",
-    "start": "node dist/server.js"
+    "start": "node dist/server.js",
+    "postinstall": "npm run build"
   },
   "dependencies": {
     "express": "^4.19.2",
@@ -20,13 +18,17 @@
     "dotenv": "^16.4.5",
     "multer": "^1.4.5-lts.1",
     "@google/generative-ai": "^0.1.0",
-    "zod": "^3.23.8"
+    "zod": "^3.23.8",
+    "typescript": "^5.5.4",
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.0.0",
+    "@types/jsonwebtoken": "^9.0.6",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.17",
+    "@types/multer": "^1.4.11"
   },
   "devDependencies": {
-    "@types/express": "^4.17.21",
-    "@types/node": "^20",
     "nodemon": "^3.1.4",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.5.4"
+    "ts-node": "^10.9.2"
   }
 }

@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { Project } from '../models/Project';
-import { DPR } from '../models/DPR';           // Create this model if not exists
+import { DPR } from '../models/DPR';
 import { BOQItem } from '../models/BOQItem';
 import { Material } from '../models/Material';
 import { Liability } from '../models/Liability';
@@ -36,8 +36,8 @@ export const createDPR = async (req: Request, res: Response) => {
       for (const usage of dprData.materialsUsed) {
         const material = await Material.findById(usage.materialId);
         if (material) {
-          material.totalConsumed += Number(usage.qty);
-          material.currentStock = Math.max(0, material.currentStock - Number(usage.qty));
+          material.totalConsumed = (material.totalConsumed || 0) + Number(usage.qty);
+          material.currentStock = Math.max(0, (material.currentStock || 0) - Number(usage.qty));
           await material.save();
         }
       }
@@ -48,7 +48,7 @@ export const createDPR = async (req: Request, res: Response) => {
       const subCon = await SubContractor.findById(dprData.subContractorId);
       if (subCon) {
         const rateObj = subCon.agreedRates.find(r => r.boqId === dprData.linkedBoqId);
-        const rate = rateObj ? rateObj.rate : 0;
+        const rate = rateObj ? (rateObj.rate || 0) : 0;
         const liabilityAmount = Number(dprData.workDoneQty) * rate;
 
         const newLiability = new Liability({
