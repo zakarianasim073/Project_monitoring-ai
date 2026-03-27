@@ -56,6 +56,7 @@ router.get('/my-projects', protect, async (req, res) => {
 
     const projects = members.map((m: any) => ({
       ...(m.project),
+      id: m.project?._id,
       myRole: m.role
     }));
 
@@ -82,7 +83,20 @@ router.get('/:projectId', protect, requireProjectRole(['DIRECTOR', 'MANAGER', 'E
 
     if (!project) return res.status(404).json({ error: 'Project not found' });
 
-    res.json(project);
+    // Map _id to id for frontend compatibility since .lean() skips virtuals
+    const projectWithId = {
+      ...project,
+      id: project._id,
+      boq: project.boq?.map((item: any) => ({ ...item, id: item._id })),
+      dprs: project.dprs?.map((item: any) => ({ ...item, id: item._id })),
+      materials: project.materials?.map((item: any) => ({ ...item, id: item._id })),
+      subContractors: project.subContractors?.map((item: any) => ({ ...item, id: item._id })),
+      bills: project.bills?.map((item: any) => ({ ...item, id: item._id })),
+      liabilities: project.liabilities?.map((item: any) => ({ ...item, id: item._id })),
+      documents: project.documents?.map((item: any) => ({ ...item, id: item._id })),
+    };
+
+    res.json(projectWithId);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
