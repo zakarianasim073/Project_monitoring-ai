@@ -50,10 +50,11 @@ router.get('/my-projects', protect, async (req, res) => {
   try {
     const { ProjectMember } = await import('../models/ProjectMember');
     const members = await ProjectMember.find({ user: (req as any).user._id })
-      .populate('project', 'name contractValue startDate endDate status priority');
+      .populate('project', 'name contractValue startDate endDate status priority')
+      .lean();
 
     const projects = members.map((m: any) => ({
-      ...m.project.toObject(),
+      ...m.project,
       myRole: m.role
     }));
 
@@ -74,7 +75,8 @@ router.get('/:projectId', protect, requireProjectRole(['DIRECTOR', 'MANAGER', 'E
       .populate('subContractors')
       .populate('bills')
       .populate('liabilities')
-      .populate('documents');
+      .populate('documents')
+      .lean();
 
     if (!project) return res.status(404).json({ error: 'Project not found' });
 
