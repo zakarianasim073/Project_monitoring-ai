@@ -11,11 +11,11 @@ services:
         value: "10000"
       - name: NODE_ENV
         value: production
-      - key: MONGO_URI
+      - name: MONGO_URI
         sync: false
-      - key: JWT_SECRET
+      - name: JWT_SECRET
         sync: false
-      - key: GEMINI_API_KEY
+      - name: GEMINI_API_KEY
         sync: false
     buildCommand: npm install && npm run build
     startCommand: node dist/server.js
