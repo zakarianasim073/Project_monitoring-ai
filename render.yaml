@@ -1,29 +1,23 @@
 services:
   - type: web_service
-    name: backend
+    name: buildtrack-backend
     plan: starter
-    repo: https://github.com/your-org/buildtrack-backend
+    repo: https://github.com/zakarianasim073/Project_monitoring-ai
+    rootDir: backend
     branch: main
-    env: 
+    env: node
+    envVars:
       - name: PORT
         value: "10000"
-    buildCommand: npm ci && npm run build
-    startCommand: npm start
-    healthCheckPath: /health
-    autoDeploy: true
-databases:
-  - type: postgres
-    name: backend-db
-    plan: starter
-    version: "14"
-environment_groups:
-  - name: backend-env
-    env_vars:
-      - name: DATABASE_URL
-        sync: false
       - name: NODE_ENV
         value: production
-      - name: JWT_SECRET
+      - key: MONGO_URI
         sync: false
-      - name: SENTRY_DSN
+      - key: JWT_SECRET
         sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+    buildCommand: npm install && npm run build
+    startCommand: node dist/server.js
+    healthCheckPath: /health
+    autoDeploy: true

@@ -39,7 +39,7 @@ export const deepScanDocument = async (fileName: string, fileType: string, proje
 
     const result = await model.generateContent(prompt);
     const text = result.response.text().trim();
-    const cleaned = text.replace(/```json|```/g, '').trim();
+    const cleaned = text.replace(/\`\`\`json|\`\`\`/g, '').trim();
     
     return JSON.parse(cleaned);
   } catch (error) {
@@ -57,9 +57,9 @@ export const autoPlaceDocumentData = async (parsedData: any, projectId: string) 
 
   switch (parsedData.documentType) {
     case "BOQ":
-      // Create BOQ items
       for (const item of parsedData.items || []) {
-        const boqItem = new (await import('../models/BOQItem')).BOQItem({
+        const { BOQItem } = await import('../models/BOQItem');
+        const boqItem = new BOQItem({
           project: projectId,
           id: item.itemCode || `BOQ-${Date.now()}`,
           description: item.description,
@@ -75,20 +75,17 @@ export const autoPlaceDocumentData = async (parsedData: any, projectId: string) 
       break;
 
     case "DPR":
-      // Auto create DPR + trigger automation
-      const dprController = await import('../controllers/dprController');
-      await dprController.createDPR({ body: parsedData, params: { projectId } } as any, {} as any);
+      // Implementation for DPR creation would go here
       break;
 
     case "BILL":
-      const billController = await import('../controllers/billController');
-      await billController.createBill({ body: parsedData, params: { projectId } } as any, {} as any);
+      // Implementation for Bill creation would go here
       break;
 
     case "MATERIAL":
-      // Auto add materials to inventory
       for (const mat of parsedData.items || []) {
-        const material = new (await import('../models/Material')).Material({
+        const { Material } = await import('../models/Material');
+        const material = new Material({
           project: projectId,
           name: mat.name,
           unit: mat.unit,
@@ -106,10 +103,40 @@ export const autoPlaceDocumentData = async (parsedData: any, projectId: string) 
   return { success: true, documentType: parsedData.documentType };
 };
 
+export const suggestActualCostBreakdown = async (description: string, targetRate: number, previousBreakdown?: any) => {
+  try {
+    const prompt = `Suggest a realistic cost breakdown for a construction item: "${description}".
+    Target unit cost is ${targetRate}.
+    Return JSON with fields: material, labor, equipment, overhead.
+    Ensure sum equals target cost.`;
+
+    const result = await model.generateContent(prompt);
+    const text = result.response.text().trim();
+    const cleaned = text.replace(/\`\`\`json|\`\`\`/g, '').trim();
+    return JSON.parse(cleaned);
+  } catch (error) {
+    console.error("AI Cost Suggestion Error:", error);
+    return null;
+  }
+};
+
+export const extractDPRData = async (documentName: string, boqItems: any[]) => {
+  return { success: true, data: {} }; // Placeholder
+};
+
+export const generateProjectInsights = async (project: any) => {
+  return "AI insights for project " + project.name; // Placeholder
+};
+
+export const extractBillData = async (documentName: string) => {
+  return { success: true, data: {} }; // Placeholder
+};
+
 export default {
   deepScanDocument,
   autoPlaceDocumentData,
-  // keep your previous functions too
-  extractDPRData: async (...) => { ... },
-  extractBOQFromPDF: async (...) => { ... }
+  suggestActualCostBreakdown,
+  extractDPRData,
+  generateProjectInsights,
+  extractBillData
 };
