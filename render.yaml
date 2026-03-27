@@ -1,0 +1,30 @@
+# render.yaml - starter blueprint for a Node backend + Postgres
+services:
+  - type: web_service
+    name: backend
+    plan: starter
+    repo: https://github.com/your-org/buildtrack-backend
+    branch: main
+    env: 
+      - name: PORT
+        value: "10000"
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+databases:
+  - type: postgres
+    name: backend-db
+    plan: starter
+    version: "14"
+environment_groups:
+  - name: backend-env
+    env_vars:
+      - name: DATABASE_URL
+        sync: false
+      - name: NODE_ENV
+        value: production
+      - name: JWT_SECRET
+        sync: false
+      - name: SENTRY_DSN
+        sync: false
