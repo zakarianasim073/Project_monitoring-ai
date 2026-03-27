@@ -10,8 +10,8 @@ export const connectDB = async () => {
       throw new Error('MONGO_URI is not defined in environment variables');
     }
 
-    // Clean up the URI from common copy-paste artifacts and trailing special characters
-    uri = uri.trim().replace(/[^a-zA-Z0-9/?=&]+$/, '');
+    // Clean up the URI from common copy-paste artifacts, trailing special characters, and common typos like '>'
+    uri = uri.trim().replace(/[>]+$/, '').replace(/[^a-zA-Z0-9/?=&]+$/, '');
 
     console.log('Connecting to MongoDB...');
 
