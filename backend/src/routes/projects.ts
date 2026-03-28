@@ -10,6 +10,11 @@ import costingController from '../controllers/costingController';
 // Gemini service for AI features
 import geminiService from '../services/geminiService';
 
+// Models
+import { Project } from '../models/Project';
+import { ProjectMember } from '../models/ProjectMember';
+import { ProjectDocument } from '../models/ProjectDocument';
+
 const router = express.Router();
 
 // SMART DOCUMENT UPLOAD + AUTO PLACE
@@ -48,12 +53,12 @@ router.post(
 // ====================== PUBLIC PROJECT LIST ======================
 router.get('/my-projects', protect, async (req, res) => {
   try {
-    const { ProjectMember } = await import('../models/ProjectMember');
     const members = await ProjectMember.find({ user: (req as any).user._id })
-      .populate('project', 'name contractValue startDate endDate status priority');
+      .populate('project', 'name contractValue startDate endDate status priority')
+      .lean();
 
     const projects = members.map((m: any) => ({
-      ...m.project.toObject(),
+      ...(m.project as any),
       myRole: m.role
     }));
 
@@ -66,7 +71,6 @@ router.get('/my-projects', protect, async (req, res) => {
 // ====================== SINGLE PROJECT (with role check) ======================
 router.get('/:projectId', protect, requireProjectRole(['DIRECTOR', 'MANAGER', 'ENGINEER', 'ACCOUNTANT']), async (req, res) => {
   try {
-    const { Project } = await import('../models/Project');
     const project = await Project.findById(req.params.projectId)
       .populate('boq')
       .populate('dprs')
@@ -74,7 +78,8 @@ router.get('/:projectId', protect, requireProjectRole(['DIRECTOR', 'MANAGER', 'E
       .populate('subContractors')
       .populate('bills')
       .populate('liabilities')
-      .populate('documents');
+      .populate('documents')
+      .lean();
 
     if (!project) return res.status(404).json({ error: 'Project not found' });
 
@@ -123,9 +128,6 @@ router.post(
   requireProjectRole(['ENGINEER', 'MANAGER', 'DIRECTOR', 'ACCOUNTANT']), 
   async (req, res) => {
     try {
-      const { ProjectDocument } = await import('../models/ProjectDocument');
-      const { Project } = await import('../models/Project');
-
       const newDoc = new ProjectDocument({
         ...req.body,
         project: req.params.projectId,
@@ -168,8 +170,7 @@ router.post(
   protect, 
   async (req, res) => {
     try {
-      const { Project } = await import('../models/Project');
-      const project = await Project.findById(req.params.projectId);
+      const project = await Project.findById(req.params.projectId).lean();
       if (!project) return res.status(404).json({ error: 'Project not found' });
 
       const insight = await geminiService.generateProjectInsights(project);

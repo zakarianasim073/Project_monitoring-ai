@@ -24,14 +24,15 @@ export const createBill = async (req: Request, res: Response) => {
     if (billData.type === 'CLIENT_RA' && billData.documentId) {
       // In real app, call Gemini to parse running bill and distribute to BOQ
       // For now, simple equal distribution as fallback
-      const activeBOQ = await BOQItem.find({ project: projectId, executedQty: { $gt: 0 } });
+      const activeBOQCount = await BOQItem.countDocuments({ project: projectId, executedQty: { $gt: 0 } });
       
-      if (activeBOQ.length > 0) {
-        const amountPerItem = billData.amount / activeBOQ.length;
-        for (const item of activeBOQ) {
-          item.billedAmount = (item.billedAmount || 0) + amountPerItem;
-          await item.save();
-        }
+      if (activeBOQCount > 0) {
+        const amountPerItem = billData.amount / activeBOQCount;
+        // Optimization: Use updateMany with $inc to avoid fetching and saving individual documents
+        await BOQItem.updateMany(
+          { project: projectId, executedQty: { $gt: 0 } },
+          { $inc: { billedAmount: amountPerItem } }
+        );
       }
     }
 
