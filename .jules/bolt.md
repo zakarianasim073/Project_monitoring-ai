@@ -1,0 +1,3 @@
+## 2026-03-28 - Backend Performance Optimization via Indexing and Bulk Operations
+**Learning:** In a construction management tool with many project-related entities, missing indexes on the `project` foreign key field causes severe performance degradation as the database grows. Furthermore, Mongoose's document hydration overhead in read-heavy routes and N+1 update patterns in controllers (looping `.save()` calls) are significant bottlenecks.
+**Action:** Always add `index: true` to foreign keys (like `project` and `user`), use `.lean()` for read-only API routes, and refactor sequential updates into atomic bulk operations like `updateMany` with `$inc`.
