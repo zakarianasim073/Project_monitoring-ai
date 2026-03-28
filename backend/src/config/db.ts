@@ -17,6 +17,28 @@ export const connectDB = async () => {
       console.warn('⚠️ Warning: Using default MONGO_URI from .env.example. Please update your environment variables.');
     }
 
+    // Performance & Resilience: Auto-encode special characters in passwords (e.g. "@", "<", ">")
+    // This prevents connection failures like EBADNAME if the user pasted an unencoded password.
+    if (uri.startsWith('mongodb+srv://') || uri.startsWith('mongodb://')) {
+      const parts = uri.split('@');
+      if (parts.length > 1) {
+        const credsPart = parts[0];
+        const lastAtIndex = uri.lastIndexOf('@');
+        const protocolAndCreds = uri.substring(0, lastAtIndex);
+        const hostAndRest = uri.substring(lastAtIndex);
+
+        const [protocol, creds] = protocolAndCreds.split('://');
+        const [username, ...passwordParts] = creds.split(':');
+        const password = passwordParts.join(':');
+
+        if (password) {
+          // Only encode if not already encoded
+          const encodedPassword = password.includes('%') ? password : encodeURIComponent(password);
+          uri = `${protocol}://${username}:${encodedPassword}${hostAndRest}`;
+        }
+      }
+    }
+
     console.log('Connecting to MongoDB...');
 
     await mongoose.connect(uri);

@@ -17,8 +17,11 @@ export const createBill = async (req: Request, res: Response) => {
     });
     await newBill.save();
 
-    project.bills.push(newBill._id);
-    await project.save();
+    // Performance optimization: use updateOne for project associations instead of save
+    await Project.updateOne(
+      { _id: projectId },
+      { $push: { bills: newBill._id } }
+    );
 
     // Auto-distribution for CLIENT_RA bills (if document attached)
     if (billData.type === 'CLIENT_RA' && billData.documentId) {

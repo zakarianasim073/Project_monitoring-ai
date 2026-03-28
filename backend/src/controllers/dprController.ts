@@ -24,23 +24,28 @@ export const createDPR = async (req: Request, res: Response) => {
 
     // 2. Auto-update BOQ executed quantity (if linked)
     if (dprData.linkedBoqId && dprData.workDoneQty) {
-      const boqItem = await BOQItem.findById(dprData.linkedBoqId);
-      if (boqItem) {
-        boqItem.executedQty += Number(dprData.workDoneQty);
-        await boqItem.save();
-      }
+      // Performance optimization: use updateOne instead of findById + save
+      await BOQItem.updateOne(
+        { _id: dprData.linkedBoqId },
+        { $inc: { executedQty: Number(dprData.workDoneQty) } }
+      );
     }
 
     // 3. Auto-deduct material stock
     if (dprData.materialsUsed && dprData.materialsUsed.length > 0) {
-      for (const usage of dprData.materialsUsed) {
-        const material = await Material.findById(usage.materialId);
-        if (material) {
-          material.totalConsumed = (material.totalConsumed || 0) + Number(usage.qty);
-          material.currentStock = Math.max(0, (material.currentStock || 0) - Number(usage.qty));
-          await material.save();
+      // Performance optimization: use bulkWrite to update materials in one call
+      const materialOps = dprData.materialsUsed.map((usage: any) => ({
+        updateOne: {
+          filter: { _id: usage.materialId },
+          update: {
+            $inc: {
+              totalConsumed: Number(usage.qty),
+              currentStock: -Number(usage.qty)
+            }
+          }
         }
-      }
+      }));
+      await Material.bulkWrite(materialOps);
     }
 
     // 4. Auto-create subcontractor liability (if linked)
@@ -66,8 +71,11 @@ export const createDPR = async (req: Request, res: Response) => {
     }
 
     // 5. Add DPR to project
-    project.dprs.push(newDPR._id);
-    await project.save();
+    // Performance optimization: use updateOne for project associations instead of save
+    await Project.updateOne(
+      { _id: projectId },
+      { $push: { dprs: newDPR._id } }
+    );
 
     res.status(201).json({
       success: true,

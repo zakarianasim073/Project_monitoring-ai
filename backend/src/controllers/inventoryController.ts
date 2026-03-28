@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
 import { Project } from '../models/Project';
 import { Material } from '../models/Material';
+import { SubContractor } from '../models/SubContractor';
+import { Bill } from '../models/Bill';
 
 export const receiveMaterial = async (req: Request, res: Response) => {
   try {
@@ -42,20 +44,27 @@ export const updatePDRemarks = async (req: Request, res: Response) => {
     const { projectId } = req.params;
     const { type, id, remarks } = req.body; // type: 'MATERIAL' | 'SUBCONTRACTOR' | 'BILL'
 
-    let target: any = null;
+    let model: any = null;
 
     if (type === 'MATERIAL') {
-      target = await Material.findById(id);
+      model = Material;
     } else if (type === 'SUBCONTRACTOR') {
-      target = await (await import('../models/SubContractor')).SubContractor.findById(id);
+      model = SubContractor;
     } else if (type === 'BILL') {
-      target = await (await import('../models/Bill')).Bill.findById(id);
+      model = Bill;
     }
 
-    if (!target) return res.status(404).json({ error: 'Item not found' });
+    if (!model) return res.status(400).json({ error: 'Invalid type' });
 
-    target.pdRemarks = remarks;
-    await target.save();
+    // Performance optimization: use updateOne instead of findById + save
+    const result = await model.updateOne(
+      { _id: id, project: projectId },
+      { $set: { pdRemarks: remarks } }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ error: 'Item not found in this project' });
+    }
 
     res.json({ success: true, message: 'Remarks updated by PD' });
 
