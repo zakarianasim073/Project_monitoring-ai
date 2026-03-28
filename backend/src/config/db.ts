@@ -10,8 +10,12 @@ export const connectDB = async () => {
       throw new Error('MONGO_URI is not defined in environment variables');
     }
 
-    // Clean up the URI from common copy-paste artifacts and trailing special characters
-    uri = uri.trim().replace(/[^a-zA-Z0-9/?=&]+$/, '');
+    // Clean up the URI from common copy-paste artifacts (trailing whitespace/newlines)
+    uri = uri.trim();
+
+    if (uri.includes('<username>') || uri.includes('<password>')) {
+      console.warn('⚠️ Warning: Using default MONGO_URI from .env.example. Please update your environment variables.');
+    }
 
     console.log('Connecting to MongoDB...');
 
@@ -19,10 +23,16 @@ export const connectDB = async () => {
     console.log('✅ MongoDB Connected');
   } catch (error) {
     console.error('MongoDB connection error:', error);
-    // Log the cleaned URI for debugging (masking password)
+    // Log the URI for debugging (masking password correctly even with multiple @ symbols)
     if (uri) {
-      const maskedUri = uri.replace(/:([^@]+)@/, ':****@');
-      console.log('Attempted URI:', maskedUri);
+      let maskedUri = uri;
+      const atIndex = uri.lastIndexOf('@');
+      const colonIndex = uri.indexOf(':', uri.indexOf('://') + 3);
+
+      if (colonIndex !== -1 && atIndex !== -1 && colonIndex < atIndex) {
+        maskedUri = uri.substring(0, colonIndex + 1) + '****' + uri.substring(atIndex);
+      }
+      console.log('Attempted URI (masked):', maskedUri);
     }
     process.exit(1);
   }
