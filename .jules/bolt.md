@@ -1,0 +1,3 @@
+## 2025-05-14 - Redundant Database Round-trips in DPR Creation
+**Learning:** The `createDPR` controller in `backend/src/controllers/dprController.ts` performs multiple sequential `save()` calls on various models (DPR, BOQItem, Material, Liability, Project) within a single request. Specifically, updating material stock in a loop using `findById` and `save()` is highly inefficient as it scales linearly with the number of materials used.
+**Action:** Use batch operations like `bulkWrite` for multiple document updates, and atomic operators like `$inc` with `updateOne` to reduce the number of database round-trips and avoid document hydration overhead when not necessary.
