@@ -16,4 +16,6 @@ const DPRSchema = new mongoose.Schema({
   }]
 }, { timestamps: true });
 
+DPRSchema.index({ project: 1 });
+
 export const DPR = mongoose.model('DPR', DPRSchema);

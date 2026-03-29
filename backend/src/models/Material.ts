@@ -11,4 +11,6 @@ const MaterialSchema = new mongoose.Schema({
   pdRemarks: String
 }, { timestamps: true });
 
+MaterialSchema.index({ project: 1 });
+
 export const Material = mongoose.model('Material', MaterialSchema);
