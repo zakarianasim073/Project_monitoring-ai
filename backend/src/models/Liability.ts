@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 
 const LiabilitySchema = new mongoose.Schema({
-  project: { type: mongoose.Schema.Types.ObjectId, ref: 'Project', required: true },
+  project: { type: mongoose.Schema.Types.ObjectId, ref: 'Project', required: true, index: true },
   description: { type: String, required: true },
   type: { 
     type: String, 

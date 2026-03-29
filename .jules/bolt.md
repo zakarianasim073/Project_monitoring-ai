@@ -1,0 +1,3 @@
+## 2025-03-29 - Missing Project-Scope Indexes
+**Learning:** In multi-tenant or project-based architectures, missing indexes on the partitioning field (e.g., `projectId`) causes collection scans as data grows, severely impacting performance for common lookups. Using `.lean()` in middleware queries further reduces overhead by skipping Mongoose document hydration for read-only checks.
+**Action:** Always verify that the primary foreign key used for scoping data (like `project`) is indexed in all related models. Use `.lean()` for all read-only database queries, especially those in high-frequency paths like auth middleware.
