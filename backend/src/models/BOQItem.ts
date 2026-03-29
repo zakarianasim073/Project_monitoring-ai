@@ -26,4 +26,6 @@ const BOQItemSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
+BOQItemSchema.index({ project: 1 });
+
 export const BOQItem = mongoose.model('BOQItem', BOQItemSchema);
