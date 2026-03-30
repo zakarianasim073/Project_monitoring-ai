@@ -1,0 +1,3 @@
+## 2025-03-30 - Environment-Specific Build Artifacts
+**Learning:** In repositories with non-standard setups (e.g., missing `index.html`), introducing common build tools (like Tailwind CSS) can lead to significant regressions if not aligned with the existing environment. Always prefer standardizing the project structure first (e.g., adding the missing `index.html`) before adding or upgrading dependencies.
+**Action:** Before any frontend task, verify the project's buildability and standardize its core structure (like `index.html` for Vite projects) if missing, and avoid unnecessary upgrades to build infrastructure.
