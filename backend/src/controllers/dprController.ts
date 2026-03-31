@@ -12,42 +12,51 @@ export const createDPR = async (req: Request, res: Response) => {
     const { projectId } = req.params;
     const dprData = req.body;
 
-    const project = await Project.findById(projectId);
-    if (!project) return res.status(404).json({ error: 'Project not found' });
+    // Use .exists() to minimize hydration overhead
+    const projectExists = await Project.exists({ _id: projectId });
+    if (!projectExists) return res.status(404).json({ error: 'Project not found' });
 
-    // 1. Create DPR
+    // 1. Create DPR document
     const newDPR = new DPR({
       ...dprData,
       project: projectId,
     });
-    await newDPR.save();
 
-    // 2. Auto-update BOQ executed quantity (if linked)
-    if (dprData.linkedBoqId && dprData.workDoneQty) {
-      const boqItem = await BOQItem.findById(dprData.linkedBoqId);
-      if (boqItem) {
-        boqItem.executedQty += Number(dprData.workDoneQty);
-        await boqItem.save();
-      }
-    }
+    const dbOps: Promise<any>[] = [];
 
-    // 3. Auto-deduct material stock
+    // 2. Parallelize initial saves and independent updates
+    dbOps.push(newDPR.save());
+
+    // 3. Batch material stock updates using bulkWrite with atomic $inc
     if (dprData.materialsUsed && dprData.materialsUsed.length > 0) {
-      for (const usage of dprData.materialsUsed) {
-        const material = await Material.findById(usage.materialId);
-        if (material) {
-          material.totalConsumed = (material.totalConsumed || 0) + Number(usage.qty);
-          material.currentStock = Math.max(0, (material.currentStock || 0) - Number(usage.qty));
-          await material.save();
+      const materialUpdates = dprData.materialsUsed.map((usage: any) => ({
+        updateOne: {
+          filter: { _id: usage.materialId },
+          update: {
+            $inc: {
+              totalConsumed: Number(usage.qty),
+              currentStock: -Number(usage.qty)
+            }
+          }
         }
-      }
+      }));
+      dbOps.push(Material.bulkWrite(materialUpdates));
     }
 
-    // 4. Auto-create subcontractor liability (if linked)
+    // 4. Update BOQ executed quantity (atomically)
+    if (dprData.linkedBoqId && dprData.workDoneQty) {
+      dbOps.push(BOQItem.updateOne(
+        { _id: dprData.linkedBoqId },
+        { $inc: { executedQty: Number(dprData.workDoneQty) } }
+      ));
+    }
+
+    // 5. Handle Subcontractor Liability
     if (dprData.subContractorId && dprData.workDoneQty && dprData.linkedBoqId) {
-      const subCon = await SubContractor.findById(dprData.subContractorId);
+      // Still need to find subcontractor for the rate
+      const subCon = await SubContractor.findById(dprData.subContractorId).lean();
       if (subCon) {
-        const rateObj = subCon.agreedRates.find(r => r.boqId === dprData.linkedBoqId);
+        const rateObj = subCon.agreedRates.find((r: any) => r.boqId === dprData.linkedBoqId);
         const rate = rateObj ? (rateObj.rate || 0) : 0;
         const liabilityAmount = Number(dprData.workDoneQty) * rate;
 
@@ -58,16 +67,30 @@ export const createDPR = async (req: Request, res: Response) => {
           amount: liabilityAmount,
           dueDate: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
         });
-        await newLiability.save();
 
-        project.liabilities.push(newLiability._id);
-        await project.save();
+        // Parallelize liability save and project update (ID is available before save)
+        dbOps.push(newLiability.save());
+        dbOps.push(Project.updateOne(
+          { _id: projectId },
+          { $push: { dprs: newDPR._id, liabilities: newLiability._id } }
+        ));
+      } else {
+        // Just push DPR if no liability
+        dbOps.push(Project.updateOne(
+          { _id: projectId },
+          { $push: { dprs: newDPR._id } }
+        ));
       }
+    } else {
+      // Just push DPR if no liability condition met
+      dbOps.push(Project.updateOne(
+        { _id: projectId },
+        { $push: { dprs: newDPR._id } }
+      ));
     }
 
-    // 5. Add DPR to project
-    project.dprs.push(newDPR._id);
-    await project.save();
+    // Execute all pending operations in parallel
+    await Promise.all(dbOps);
 
     res.status(201).json({
       success: true,
@@ -77,7 +100,7 @@ export const createDPR = async (req: Request, res: Response) => {
 
   } catch (error: any) {
     console.error(error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: "Internal server error" });
   }
 };
 
