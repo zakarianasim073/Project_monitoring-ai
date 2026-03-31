@@ -6,46 +6,53 @@ import { Material } from '../models/Material';
 import { Liability } from '../models/Liability';
 import { SubContractor } from '../models/SubContractor';
 
-// Create DPR with full automation
+// Create DPR with full automation - Optimized for database performance
 export const createDPR = async (req: Request, res: Response) => {
   try {
     const { projectId } = req.params;
     const dprData = req.body;
 
-    const project = await Project.findById(projectId);
-    if (!project) return res.status(404).json({ error: 'Project not found' });
+    // Use .exists() for faster initial validation without full document hydration
+    const projectExists = await Project.exists({ _id: projectId });
+    if (!projectExists) return res.status(404).json({ error: 'Project not found' });
 
-    // 1. Create DPR
+    // 1. Prepare DPR (Mongoose generates ID locally, allowing parallel operations)
     const newDPR = new DPR({
       ...dprData,
       project: projectId,
     });
-    await newDPR.save();
 
-    // 2. Auto-update BOQ executed quantity (if linked)
+    const dbOps: Promise<any>[] = [newDPR.save()];
+
+    // 2. Auto-update BOQ executed quantity (if linked) using atomic update
     if (dprData.linkedBoqId && dprData.workDoneQty) {
-      const boqItem = await BOQItem.findById(dprData.linkedBoqId);
-      if (boqItem) {
-        boqItem.executedQty += Number(dprData.workDoneQty);
-        await boqItem.save();
-      }
+      dbOps.push(BOQItem.updateOne(
+        { _id: dprData.linkedBoqId },
+        { $inc: { executedQty: Number(dprData.workDoneQty) } }
+      ));
     }
 
-    // 3. Auto-deduct material stock
+    // 3. Auto-deduct material stock using bulkWrite (atomic $inc) to avoid N+1 queries
     if (dprData.materialsUsed && dprData.materialsUsed.length > 0) {
-      for (const usage of dprData.materialsUsed) {
-        const material = await Material.findById(usage.materialId);
-        if (material) {
-          material.totalConsumed = (material.totalConsumed || 0) + Number(usage.qty);
-          material.currentStock = Math.max(0, (material.currentStock || 0) - Number(usage.qty));
-          await material.save();
+      const materialOps = dprData.materialsUsed.map((usage: any) => ({
+        updateOne: {
+          filter: { _id: usage.materialId },
+          update: {
+            $inc: {
+              totalConsumed: Number(usage.qty),
+              currentStock: -Number(usage.qty)
+            }
+          }
         }
-      }
+      }));
+      dbOps.push(Material.bulkWrite(materialOps));
     }
 
-    // 4. Auto-create subcontractor liability (if linked)
+    // 4. Handle SubContractor Liability if applicable
+    let liabilityId: any = null;
     if (dprData.subContractorId && dprData.workDoneQty && dprData.linkedBoqId) {
-      const subCon = await SubContractor.findById(dprData.subContractorId);
+      // Use .lean() for faster read-only lookup
+      const subCon = await SubContractor.findById(dprData.subContractorId).lean();
       if (subCon) {
         const rateObj = subCon.agreedRates.find(r => r.boqId === dprData.linkedBoqId);
         const rate = rateObj ? (rateObj.rate || 0) : 0;
@@ -58,16 +65,22 @@ export const createDPR = async (req: Request, res: Response) => {
           amount: liabilityAmount,
           dueDate: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
         });
-        await newLiability.save();
 
-        project.liabilities.push(newLiability._id);
-        await project.save();
+        dbOps.push(newLiability.save());
+        liabilityId = newLiability._id;
       }
     }
 
-    // 5. Add DPR to project
-    project.dprs.push(newDPR._id);
-    await project.save();
+    // Parallelize all independent database operations to reduce response time
+    await Promise.all(dbOps);
+
+    // 5. Finalize Project associations in a single atomic update
+    const projectUpdates: any = { $push: { dprs: newDPR._id } };
+    if (liabilityId) {
+      projectUpdates.$push.liabilities = liabilityId;
+    }
+
+    await Project.updateOne({ _id: projectId }, projectUpdates);
 
     res.status(201).json({
       success: true,
