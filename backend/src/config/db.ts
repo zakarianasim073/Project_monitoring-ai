@@ -10,8 +10,29 @@ export const connectDB = async () => {
       throw new Error('MONGO_URI is not defined in environment variables');
     }
 
-    // Clean up the URI from common copy-paste artifacts and trailing special characters
-    uri = uri.trim().replace(/[^a-zA-Z0-9/?=&]+$/, '');
+    // Clean and URL-encode the password in MONGO_URI to handle special characters (e.g., '>', '@')
+    uri = uri.trim();
+
+    // Remove any trailing special characters that might have been accidentally pasted
+    uri = uri.replace(/[>]+$/, '');
+
+    if (uri.startsWith('mongodb+srv://')) {
+      const atIndex = uri.lastIndexOf('@');
+      if (atIndex !== -1) {
+        const protocolPart = 'mongodb+srv://';
+        const credentialsPart = uri.substring(protocolPart.length, atIndex);
+        const hostPart = uri.substring(atIndex + 1);
+
+        if (credentialsPart.includes(':')) {
+          const colonIndex = credentialsPart.indexOf(':');
+          const username = credentialsPart.substring(0, colonIndex);
+          const password = credentialsPart.substring(colonIndex + 1);
+
+          const encodedPassword = encodeURIComponent(decodeURIComponent(password));
+          uri = `${protocolPart}${username}:${encodedPassword}@${hostPart}`;
+        }
+      }
+    }
 
     console.log('Connecting to MongoDB...');
 
@@ -19,10 +40,16 @@ export const connectDB = async () => {
     console.log('✅ MongoDB Connected');
   } catch (error) {
     console.error('MongoDB connection error:', error);
-    // Log the cleaned URI for debugging (masking password)
+    // Log the masked URI for debugging
     if (uri) {
-      const maskedUri = uri.replace(/:([^@]+)@/, ':****@');
-      console.log('Attempted URI:', maskedUri);
+      const atIndex = uri.lastIndexOf('@');
+      const colonIndex = uri.indexOf(':', uri.indexOf('://') + 3);
+      if (atIndex !== -1 && colonIndex !== -1 && colonIndex < atIndex) {
+        const maskedUri = uri.substring(0, colonIndex + 1) + '****' + uri.substring(atIndex);
+        console.log('Attempted URI:', maskedUri);
+      } else {
+        console.log('Attempted URI: [INVALID_FORMAT]');
+      }
     }
     process.exit(1);
   }
