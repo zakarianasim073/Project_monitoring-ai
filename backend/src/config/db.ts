@@ -12,15 +12,25 @@ export const connectDB = async () => {
 
     // Clean and URL-encode the password in MONGO_URI to handle special characters (e.g., '>', '@')
     uri = uri.trim();
-    if (uri.startsWith('mongodb+srv://') && uri.includes('@')) {
-      const parts = uri.split('://')[1].split('@');
-      const credentials = parts[0];
-      const host = parts.slice(1).join('@'); // Handle hostnames containing '@' if any
 
-      if (credentials.includes(':')) {
-        const [username, password] = credentials.split(':');
-        const encodedPassword = encodeURIComponent(decodeURIComponent(password));
-        uri = `mongodb+srv://${username}:${encodedPassword}@${host}`;
+    // Remove any trailing special characters that might have been accidentally pasted
+    uri = uri.replace(/[>]+$/, '');
+
+    if (uri.startsWith('mongodb+srv://')) {
+      const atIndex = uri.lastIndexOf('@');
+      if (atIndex !== -1) {
+        const protocolPart = 'mongodb+srv://';
+        const credentialsPart = uri.substring(protocolPart.length, atIndex);
+        const hostPart = uri.substring(atIndex + 1);
+
+        if (credentialsPart.includes(':')) {
+          const colonIndex = credentialsPart.indexOf(':');
+          const username = credentialsPart.substring(0, colonIndex);
+          const password = credentialsPart.substring(colonIndex + 1);
+
+          const encodedPassword = encodeURIComponent(decodeURIComponent(password));
+          uri = `${protocolPart}${username}:${encodedPassword}@${hostPart}`;
+        }
       }
     }
 
