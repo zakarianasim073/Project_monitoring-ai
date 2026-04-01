@@ -67,6 +67,7 @@ router.get('/my-projects', protect, async (req, res) => {
 router.get('/:projectId', protect, requireProjectRole(['DIRECTOR', 'MANAGER', 'ENGINEER', 'ACCOUNTANT']), async (req, res) => {
   try {
     const { Project } = await import('../models/Project');
+    // Use .lean() for faster retrieval of large populated objects
     const project = await Project.findById(req.params.projectId)
       .populate('boq')
       .populate('dprs')
@@ -74,7 +75,8 @@ router.get('/:projectId', protect, requireProjectRole(['DIRECTOR', 'MANAGER', 'E
       .populate('subContractors')
       .populate('bills')
       .populate('liabilities')
-      .populate('documents');
+      .populate('documents')
+      .lean();
 
     if (!project) return res.status(404).json({ error: 'Project not found' });
 
