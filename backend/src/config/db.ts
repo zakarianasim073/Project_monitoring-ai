@@ -3,25 +3,53 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-export const connectDB = async () => {
-  let uri = process.env.MONGO_URI || '';
+const safeEncode = (str: string) => {
   try {
-    if (!uri) {
+    return encodeURIComponent(decodeURIComponent(str));
+  } catch {
+    return encodeURIComponent(str);
+  }
+};
+
+export const connectDB = async () => {
+  let rawUri = process.env.MONGO_URI || '';
+  let uriToUse = rawUri.trim();
+
+  try {
+    if (!uriToUse) {
       throw new Error('MONGO_URI is not defined in environment variables');
     }
 
-    // Clean up the URI from common copy-paste artifacts and trailing special characters
-    uri = uri.trim().replace(/[^a-zA-Z0-9/?=&]+$/, '');
+    // Performance Optimization: Sanitize and safely encode URI components to prevent connection failures
+    // Identifying the last '@' as the host separator allows for passwords containing '@' or other special characters.
+    if (uriToUse.includes('://') && uriToUse.includes('@')) {
+      const protocolPart = uriToUse.split('://')[0];
+      const rest = uriToUse.split('://')[1];
+      const lastAtIndex = rest.lastIndexOf('@');
+
+      if (lastAtIndex !== -1) {
+        const credentials = rest.substring(0, lastAtIndex);
+        const hostPath = rest.substring(lastAtIndex + 1);
+
+        if (credentials.includes(':')) {
+          const [user, ...pwdParts] = credentials.split(':');
+          const pwd = pwdParts.join(':');
+          uriToUse = `${protocolPart}://${user}:${safeEncode(pwd)}@${hostPath}`;
+        }
+      }
+    }
 
     console.log('Connecting to MongoDB...');
-
-    await mongoose.connect(uri);
+    await mongoose.connect(uriToUse);
     console.log('✅ MongoDB Connected');
   } catch (error) {
     console.error('MongoDB connection error:', error);
-    // Log the cleaned URI for debugging (masking password)
-    if (uri) {
-      const maskedUri = uri.replace(/:([^@]+)@/, ':****@');
+    // Mask password in logs
+    if (uriToUse) {
+      const maskedUri = uriToUse.replace(/:([^@]+)@/, (match, p1) => {
+        const lastAt = match.lastIndexOf('@');
+        return `:****@${match.substring(lastAt + 1)}`;
+      });
       console.log('Attempted URI:', maskedUri);
     }
     process.exit(1);
