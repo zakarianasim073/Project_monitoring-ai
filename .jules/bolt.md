@@ -1,0 +1,3 @@
+## 2026-04-04 - Optimizing Database Operations in Controllers
+**Learning:** Sequential database lookups and updates within a single request cycle, as well as multiple saves on the same document (e.g., `project.save()`), significantly increase request latency and database load. Using `Promise.all` for parallelization and `bulkWrite` for batch updates can drastically reduce the number of round-trips to the database.
+**Action:** Always look for opportunities to parallelize independent database operations and batch multiple document updates into a single operation. Minimize document hydration overhead by using `.lean()` for read-only queries.
