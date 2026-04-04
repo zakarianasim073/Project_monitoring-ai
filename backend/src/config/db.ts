@@ -3,6 +3,29 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+const safeEncode = (uri: string): string => {
+  if (!uri.includes('@')) return uri;
+
+  try {
+    const lastAtIndex = uri.lastIndexOf('@');
+    const partBeforeAt = uri.substring(0, lastAtIndex);
+    const partAfterAt = uri.substring(lastAtIndex);
+
+    // Split into prefix (e.g., mongodb+srv://user) and password
+    const passwordIndex = partBeforeAt.lastIndexOf(':');
+    if (passwordIndex === -1 || passwordIndex < partBeforeAt.indexOf('://') + 3) {
+      return uri;
+    }
+
+    const prefix = partBeforeAt.substring(0, passwordIndex + 1);
+    const password = partBeforeAt.substring(passwordIndex + 1);
+
+    return `${prefix}${encodeURIComponent(password)}${partAfterAt}`;
+  } catch (e) {
+    return uri;
+  }
+};
+
 export const connectDB = async () => {
   let uri = process.env.MONGO_URI || '';
   try {
@@ -10,8 +33,8 @@ export const connectDB = async () => {
       throw new Error('MONGO_URI is not defined in environment variables');
     }
 
-    // Clean up the URI from common copy-paste artifacts and trailing special characters
-    uri = uri.trim().replace(/[^a-zA-Z0-9/?=&]+$/, '');
+    // URL-encode password to handle special characters and prevent EBADNAME errors
+    uri = safeEncode(uri.trim());
 
     console.log('Connecting to MongoDB...');
 
