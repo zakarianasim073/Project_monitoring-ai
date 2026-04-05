@@ -8,30 +8,41 @@ export const createBill = async (req: Request, res: Response) => {
     const { projectId } = req.params;
     const billData = req.body;
 
-    const project = await Project.findById(projectId);
-    if (!project) return res.status(404).json({ error: 'Project not found' });
+    // Use .exists() for faster validation (skips document hydration)
+    const projectExists = await Project.exists({ _id: projectId });
+    if (!projectExists) return res.status(404).json({ error: 'Project not found' });
 
     const newBill = new Bill({
       ...billData,
       project: projectId,
     });
-    await newBill.save();
 
-    project.bills.push(newBill._id);
-    await project.save();
+    // Parallelize bill creation and project update to reduce request latency
+    // Mongoose generates _id locally, so we can use it immediately
+    await Promise.all([
+      newBill.save(),
+      Project.updateOne(
+        { _id: projectId },
+        { $push: { bills: newBill._id } }
+      )
+    ]);
 
     // Auto-distribution for CLIENT_RA bills (if document attached)
     if (billData.type === 'CLIENT_RA' && billData.documentId) {
-      // In real app, call Gemini to parse running bill and distribute to BOQ
-      // For now, simple equal distribution as fallback
-      const activeBOQ = await BOQItem.find({ project: projectId, executedQty: { $gt: 0 } });
+      // Use countDocuments instead of find() to avoid fetching full items into memory
+      const activeBOQCount = await BOQItem.countDocuments({
+        project: projectId,
+        executedQty: { $gt: 0 }
+      });
       
-      if (activeBOQ.length > 0) {
-        const amountPerItem = billData.amount / activeBOQ.length;
-        for (const item of activeBOQ) {
-          item.billedAmount = (item.billedAmount || 0) + amountPerItem;
-          await item.save();
-        }
+      if (activeBOQCount > 0) {
+        const amountPerItem = billData.amount / activeBOQCount;
+        // Optimize: Use updateMany with $inc to perform bulk atomic update in O(1)
+        // instead of O(N) sequential .save() calls in a loop.
+        await BOQItem.updateMany(
+          { project: projectId, executedQty: { $gt: 0 } },
+          { $inc: { billedAmount: amountPerItem } }
+        );
       }
     }
 
