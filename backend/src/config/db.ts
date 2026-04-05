@@ -11,7 +11,8 @@ export const connectDB = async () => {
     }
 
     // Bolt: Clean URI from copy-paste artifacts (like trailing '>')
-    uri = uri.trim().replace(/[^a-zA-Z0-9/?=&]+$/, '');
+    // This is critical for robust connection setup when special characters are present.
+    uri = uri.trim().replace(/[> ]+$/, '');
 
     console.log('Connecting to MongoDB...');
 

@@ -39,7 +39,7 @@ export const createDPR = async (req: Request, res: Response) => {
           const material = await Material.findById(usage.materialId);
           if (material) {
             material.totalConsumed = (material.totalConsumed || 0) + Number(usage.qty);
-            // Bolt: Preserving stock clamping logic
+            // Bolt: Preserving stock clamping logic (preventing negative values)
             material.currentStock = Math.max(0, (material.currentStock || 0) - Number(usage.qty));
             await material.save();
           }
@@ -50,6 +50,7 @@ export const createDPR = async (req: Request, res: Response) => {
     // 4. Auto-create subcontractor liability (if linked)
     if (dprData.subContractorId && dprData.workDoneQty && dprData.linkedBoqId) {
       tasks.push((async () => {
+        // Optimized: Find sub-contractor without full project hydration
         const subCon = await SubContractor.findById(dprData.subContractorId);
         if (subCon) {
           const rateObj = subCon.agreedRates.find(r => r.boqId === dprData.linkedBoqId);
@@ -65,7 +66,7 @@ export const createDPR = async (req: Request, res: Response) => {
           });
           await newLiability.save();
 
-          // Bolt: Use updateOne for linking to project
+          // Bolt: Use updateOne for linking liability to project
           await Project.updateOne(
             { _id: projectId },
             { $push: { liabilities: newLiability._id } }
@@ -80,7 +81,7 @@ export const createDPR = async (req: Request, res: Response) => {
       { $push: { dprs: newDPR._id } }
     ));
 
-    // Parallelize independent operations to minimize total request latency
+    // Parallelize all independent database writes to minimize overall request latency
     await Promise.all(tasks);
 
     res.status(201).json({
