@@ -10,8 +10,9 @@ export const connectDB = async () => {
       throw new Error('MONGO_URI is not defined in environment variables');
     }
 
-    // Clean up the URI from common copy-paste artifacts and trailing special characters
-    uri = uri.trim().replace(/[^a-zA-Z0-9/?=&]+$/, '');
+    // Bolt: Clean URI from copy-paste artifacts (like trailing '>')
+    // This is critical for robust connection setup when special characters are present.
+    uri = uri.trim().replace(/[> ]+$/, '');
 
     console.log('Connecting to MongoDB...');
 
