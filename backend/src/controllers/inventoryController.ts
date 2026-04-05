@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
 import { Project } from '../models/Project';
 import { Material } from '../models/Material';
+import { SubContractor } from '../models/SubContractor';
+import { Bill } from '../models/Bill';
 
 export const receiveMaterial = async (req: Request, res: Response) => {
   try {
@@ -47,9 +49,9 @@ export const updatePDRemarks = async (req: Request, res: Response) => {
     if (type === 'MATERIAL') {
       target = await Material.findById(id);
     } else if (type === 'SUBCONTRACTOR') {
-      target = await (await import('../models/SubContractor')).SubContractor.findById(id);
+      target = await SubContractor.findById(id);
     } else if (type === 'BILL') {
-      target = await (await import('../models/Bill')).Bill.findById(id);
+      target = await Bill.findById(id);
     }
 
     if (!target) return res.status(404).json({ error: 'Item not found' });

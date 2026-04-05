@@ -8,30 +8,35 @@ export const createBill = async (req: Request, res: Response) => {
     const { projectId } = req.params;
     const billData = req.body;
 
-    const project = await Project.findById(projectId);
-    if (!project) return res.status(404).json({ error: 'Project not found' });
+    // PERFORMANCE: Using exists() instead of findById() to avoid document hydration overhead
+    const projectExists = await Project.exists({ _id: projectId });
+    if (!projectExists) return res.status(404).json({ error: 'Project not found' });
 
     const newBill = new Bill({
       ...billData,
       project: projectId,
     });
-    await newBill.save();
 
-    project.bills.push(newBill._id);
-    await project.save();
+    // PERFORMANCE: Parallelize independent operations (save bill and link to project)
+    await Promise.all([
+      newBill.save(),
+      Project.updateOne({ _id: projectId }, { $push: { bills: newBill._id } })
+    ]);
 
     // Auto-distribution for CLIENT_RA bills (if document attached)
     if (billData.type === 'CLIENT_RA' && billData.documentId) {
       // In real app, call Gemini to parse running bill and distribute to BOQ
       // For now, simple equal distribution as fallback
-      const activeBOQ = await BOQItem.find({ project: projectId, executedQty: { $gt: 0 } });
+      const activeBOQIds = await BOQItem.find({ project: projectId, executedQty: { $gt: 0 } }).distinct('_id');
       
-      if (activeBOQ.length > 0) {
-        const amountPerItem = billData.amount / activeBOQ.length;
-        for (const item of activeBOQ) {
-          item.billedAmount = (item.billedAmount || 0) + amountPerItem;
-          await item.save();
-        }
+      if (activeBOQIds.length > 0) {
+        const amountPerItem = billData.amount / activeBOQIds.length;
+        // PERFORMANCE: Replace sequential save() calls in a loop with a single updateMany
+        // This reduces N+1 database round-trips to a single atomic operation
+        await BOQItem.updateMany(
+          { _id: { $in: activeBOQIds } },
+          { $inc: { billedAmount: amountPerItem } }
+        );
       }
     }
 
