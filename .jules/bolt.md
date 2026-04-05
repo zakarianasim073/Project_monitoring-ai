@@ -1,0 +1,3 @@
+## 2025-05-15 - N+1 Database Update Anti-pattern
+**Learning:** Iterating over a collection of documents and calling `.save()` on each inside a loop creates multiple database round-trips (N+1 updates), significantly increasing request latency as the dataset grows. Mongoose document hydration also adds unnecessary CPU and memory overhead when only simple updates are needed.
+**Action:** Use `updateMany` or `bulkWrite` with atomic operators (like `$inc`, `$push`, `$set`) to perform batch updates in a single database round-trip. Use `Model.exists()` for existence validation to skip document hydration.
