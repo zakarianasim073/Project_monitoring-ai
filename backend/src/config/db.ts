@@ -15,18 +15,26 @@ export const connectDB = async () => {
     uri = uri.trim().replace(/[> ]+$/, '');
 
     // Ensure special characters like '>' in the password are URL-encoded
-    if (uri.includes(':') && uri.includes('@')) {
-      const parts = uri.split('@');
-      const connectionPart = parts[0];
-      const hostPart = parts.slice(1).join('@');
-      const protocolSplit = connectionPart.split('://');
+    // We target the password between the last colon (before @) and the last @ (before the host)
+    if (uri.includes('://') && uri.includes('@')) {
+      const protocolSplit = uri.split('://');
       const protocol = protocolSplit[0];
-      const credentials = protocolSplit[1];
+      const rest = protocolSplit[1];
 
-      if (credentials && credentials.includes(':')) {
-        const [username, password] = credentials.split(':');
-        const encodedPassword = encodeURIComponent(decodeURIComponent(password));
-        uri = `${protocol}://${username}:${encodedPassword}@${hostPart}`;
+      const lastAtIndex = rest.lastIndexOf('@');
+      if (lastAtIndex !== -1) {
+        const credentialsPart = rest.substring(0, lastAtIndex);
+        const hostPart = rest.substring(lastAtIndex + 1);
+
+        const firstColonIndex = credentialsPart.indexOf(':');
+        if (firstColonIndex !== -1) {
+          const username = credentialsPart.substring(0, firstColonIndex);
+          const password = credentialsPart.substring(firstColonIndex + 1);
+
+          // Re-encode to handle special characters correctly
+          const encodedPassword = encodeURIComponent(decodeURIComponent(password));
+          uri = `${protocol}://${username}:${encodedPassword}@${hostPart}`;
+        }
       }
     }
 
