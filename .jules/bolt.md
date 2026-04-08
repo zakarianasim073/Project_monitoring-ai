@@ -1,0 +1,3 @@
+## 2024-05-23 - [Parallelized DPR Creation]
+**Learning:** Sequential await calls in complex controllers (like DPR creation) create significant latency. N+1 loops (findById + save in a loop) are particularly slow and can be replaced by parallelized `updateOne` calls. Pre-instantiating documents to get IDs allows parallelizing `.save()` calls with other dependent updates (like updating the parent Project).
+**Action:** Always look for fetch-then-save patterns and sequential awaits. Use `Promise.all` and atomic MongoDB operations ($inc, $push, aggregation pipelines for clamped values) to optimize database interactions.
