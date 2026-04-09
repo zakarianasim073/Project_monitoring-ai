@@ -17,11 +17,8 @@ export const createBill = async (req: Request, res: Response) => {
       project: projectId,
     });
 
-    // Parallelize Bill creation and Project update
-    const [savedBill] = await Promise.all([
-      newBill.save(),
-      Project.updateOne({ _id: projectId }, { $push: { bills: newBill._id } })
-    ]);
+    const savedBill = await newBill.save();
+    await Project.updateOne({ _id: projectId }, { $push: { bills: newBill._id } });
 
     // Auto-distribution for CLIENT_RA bills (if document attached)
     if (billData.type === 'CLIENT_RA' && billData.documentId) {

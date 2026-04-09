@@ -78,11 +78,11 @@ export const createDPR = async (req: Request, res: Response) => {
       }
     }
 
-    // 5. Add DPR to project
-    tasks.push(Project.updateOne({ _id: projectId }, { $push: { dprs: newDPR._id } }));
-
     // Execute all tasks in parallel
     await Promise.all(tasks);
+
+    // 5. Add DPR to project - Execute AFTER save confirmed to avoid dangling references
+    await Project.updateOne({ _id: projectId }, { $push: { dprs: newDPR._id } });
 
     res.status(201).json({
       success: true,
