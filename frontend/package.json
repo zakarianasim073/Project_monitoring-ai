@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "scripts": {
     "dev": "next dev",
-    "build": "tsc && next build",
+    "build": "vite build",
     "start": "next start"
   },
   "dependencies": {
