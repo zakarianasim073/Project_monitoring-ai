@@ -77,7 +77,7 @@ const Login: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-3 text-slate-400 hover:text-slate-600 focus:outline-none"
+                  className="absolute right-4 top-3.5 text-slate-400 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded-lg"
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
@@ -88,7 +88,6 @@ const Login: React.FC = () => {
             <button
               type="submit"
               disabled={loading}
-              aria-label={loading ? 'Logging in' : 'Log in to your account'}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-2xl font-bold text-lg transition-all disabled:opacity-70"
             >
               {loading ? 'Logging in...' : 'Login'}
@@ -96,21 +95,21 @@ const Login: React.FC = () => {
           </form>
 
           <div className="mt-8 text-center">
-            <p className="text-xs text-slate-500 mb-3">Quick Login (Demo Accounts):</p>
+            <p className="text-xs text-slate-500 mb-3 italic">Quick Login for Demo Accounts:</p>
             <div className="flex flex-col gap-2">
               <button
                 type="button"
                 onClick={() => { setEmail('director@buildtrack.bd'); setPassword('123456'); }}
-                className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 px-4 rounded-xl transition-colors"
+                className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 py-2.5 px-4 rounded-xl transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 outline-none"
               >
-                Director: director@buildtrack.bd
+                Director Login
               </button>
               <button
                 type="button"
                 onClick={() => { setEmail('engineer@buildtrack.bd'); setPassword('123456'); }}
-                className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 px-4 rounded-xl transition-colors"
+                className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 py-2.5 px-4 rounded-xl transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 outline-none"
               >
-                Engineer: engineer@buildtrack.bd
+                Engineer Login
               </button>
             </div>
           </div>

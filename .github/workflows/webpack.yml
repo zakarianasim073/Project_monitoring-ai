@@ -22,7 +22,19 @@ jobs:
       with:
         node-version: ${{ matrix.node-version }}
 
-    - name: Build
+    - name: Install pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: 10
+
+    - name: Build Backend
       run: |
-        npm install
-        npx webpack
+        cd backend
+        pnpm install
+        pnpm build
+
+    - name: Build Frontend
+      run: |
+        cd frontend
+        pnpm install
+        pnpm build
