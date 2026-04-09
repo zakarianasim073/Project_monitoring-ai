@@ -24,14 +24,15 @@ export const createBill = async (req: Request, res: Response) => {
     if (billData.type === 'CLIENT_RA' && billData.documentId) {
       // In real app, call Gemini to parse running bill and distribute to BOQ
       // For now, simple equal distribution as fallback
-      const activeBOQ = await BOQItem.find({ project: projectId, executedQty: { $gt: 0 } });
+      const query = { project: projectId, executedQty: { $gt: 0 } };
+
+      // Performance Optimization: Reduced O(N) sequential saves to O(2) bulk operations
+      // This minimizes database round-trips and avoids hydrating many Mongoose documents in memory.
+      const activeCount = await BOQItem.countDocuments(query);
       
-      if (activeBOQ.length > 0) {
-        const amountPerItem = billData.amount / activeBOQ.length;
-        for (const item of activeBOQ) {
-          item.billedAmount = (item.billedAmount || 0) + amountPerItem;
-          await item.save();
-        }
+      if (activeCount > 0) {
+        const amountPerItem = billData.amount / activeCount;
+        await BOQItem.updateMany(query, { $inc: { billedAmount: amountPerItem } });
       }
     }
 
