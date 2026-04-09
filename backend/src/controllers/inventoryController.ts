@@ -7,19 +7,24 @@ export const receiveMaterial = async (req: Request, res: Response) => {
     const { projectId } = req.params;
     const { materialId, qty, rate } = req.body;
 
-    const project = await Project.findById(projectId);
-    if (!project) return res.status(404).json({ error: 'Project not found' });
+    // PERFORMANCE: Use .exists() and parallelize existence checks
+    const [projectExists, material] = await Promise.all([
+      Project.exists({ _id: projectId }),
+      Material.findById(materialId)
+    ]);
 
-    const material = await Material.findById(materialId);
+    if (!projectExists) return res.status(404).json({ error: 'Project not found' });
     if (!material) return res.status(404).json({ error: 'Material not found' });
 
-    // Update stock
-    material.totalReceived += Number(qty);
-    material.currentStock += Number(qty);
+    // Update stock and weighted average rate
+    // Note: weighted average calculation requires the old totalReceived, so we keep the fetch-then-save
+    // but we've parallelized the project existence check.
+    const oldTotalReceived = material.totalReceived || 0;
+    material.totalReceived = oldTotalReceived + Number(qty);
+    material.currentStock = (material.currentStock || 0) + Number(qty);
     
     if (rate) {
-      // Update average rate (weighted average)
-      const oldTotalValue = material.averageRate * material.totalReceived;
+      const oldTotalValue = (material.averageRate || 0) * oldTotalReceived;
       const newTotalValue = oldTotalValue + (Number(rate) * Number(qty));
       material.averageRate = newTotalValue / material.totalReceived;
     }
