@@ -8,30 +8,38 @@ export const createBill = async (req: Request, res: Response) => {
     const { projectId } = req.params;
     const billData = req.body;
 
-    const project = await Project.findById(projectId);
-    if (!project) return res.status(404).json({ error: 'Project not found' });
+    // PERFORMANCE: Using exists() avoids document hydration
+    const projectExists = await Project.exists({ _id: projectId });
+    if (!projectExists) return res.status(404).json({ error: 'Project not found' });
 
     const newBill = new Bill({
       ...billData,
       project: projectId,
     });
+
+    // SECURITY: Project updates and Bill creation are kept sequential for data integrity
     await newBill.save();
 
-    project.bills.push(newBill._id);
-    await project.save();
+    await Project.updateOne(
+      { _id: projectId },
+      { $push: { bills: newBill._id } }
+    );
 
     // Auto-distribution for CLIENT_RA bills (if document attached)
     if (billData.type === 'CLIENT_RA' && billData.documentId) {
-      // In real app, call Gemini to parse running bill and distribute to BOQ
-      // For now, simple equal distribution as fallback
-      const activeBOQ = await BOQItem.find({ project: projectId, executedQty: { $gt: 0 } });
+      // PERFORMANCE: Replace N+1 save loop with atomic updateMany
+      // SECURITY: Scoped by projectId to prevent BOLA
+      const activeCount = await BOQItem.countDocuments({
+        project: projectId,
+        executedQty: { $gt: 0 }
+      });
       
-      if (activeBOQ.length > 0) {
-        const amountPerItem = billData.amount / activeBOQ.length;
-        for (const item of activeBOQ) {
-          item.billedAmount = (item.billedAmount || 0) + amountPerItem;
-          await item.save();
-        }
+      if (activeCount > 0) {
+        const amountPerItem = billData.amount / activeCount;
+        await BOQItem.updateMany(
+          { project: projectId, executedQty: { $gt: 0 } },
+          { $inc: { billedAmount: amountPerItem } }
+        );
       }
     }
 
