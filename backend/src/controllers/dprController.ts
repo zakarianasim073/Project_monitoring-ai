@@ -15,32 +15,36 @@ export const createDPR = async (req: Request, res: Response) => {
     const project = await Project.findById(projectId);
     if (!project) return res.status(404).json({ error: 'Project not found' });
 
-    // 1. Create DPR
+    // 1. Instantiate DPR (generates _id locally)
     const newDPR = new DPR({
       ...dprData,
       project: projectId,
     });
-    await newDPR.save();
+
+    const tasks: Promise<any>[] = [newDPR.save()];
 
     // 2. Auto-update BOQ executed quantity (if linked)
     if (dprData.linkedBoqId && dprData.workDoneQty) {
-      const boqItem = await BOQItem.findById(dprData.linkedBoqId);
-      if (boqItem) {
-        boqItem.executedQty += Number(dprData.workDoneQty);
-        await boqItem.save();
-      }
+      tasks.push(BOQItem.updateOne(
+        { _id: dprData.linkedBoqId },
+        { $inc: { executedQty: Number(dprData.workDoneQty) } }
+      ));
     }
 
-    // 3. Auto-deduct material stock
+    // 3. Auto-deduct material stock (using bulkWrite for efficiency)
     if (dprData.materialsUsed && dprData.materialsUsed.length > 0) {
-      for (const usage of dprData.materialsUsed) {
-        const material = await Material.findById(usage.materialId);
-        if (material) {
-          material.totalConsumed = (material.totalConsumed || 0) + Number(usage.qty);
-          material.currentStock = Math.max(0, (material.currentStock || 0) - Number(usage.qty));
-          await material.save();
+      const materialOps = dprData.materialsUsed.map((usage: any) => ({
+        updateOne: {
+          filter: { _id: usage.materialId },
+          update: {
+            $inc: {
+              totalConsumed: Number(usage.qty),
+              currentStock: -Number(usage.qty)
+            }
+          }
         }
-      }
+      }));
+      tasks.push(Material.bulkWrite(materialOps));
     }
 
     // 4. Auto-create subcontractor liability (if linked)
@@ -58,16 +62,19 @@ export const createDPR = async (req: Request, res: Response) => {
           amount: liabilityAmount,
           dueDate: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
         });
-        await newLiability.save();
 
+        // Parallelize liability creation and project update
+        tasks.push(newLiability.save());
         project.liabilities.push(newLiability._id);
-        await project.save();
       }
     }
 
-    // 5. Add DPR to project
+    // 5. Update Project with new DPR and finalize in one save
     project.dprs.push(newDPR._id);
-    await project.save();
+    tasks.push(project.save());
+
+    // Execute all database operations in parallel
+    await Promise.all(tasks);
 
     res.status(201).json({
       success: true,
