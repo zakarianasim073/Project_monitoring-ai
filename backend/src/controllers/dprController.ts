@@ -12,34 +12,49 @@ export const createDPR = async (req: Request, res: Response) => {
     const { projectId } = req.params;
     const dprData = req.body;
 
-    const project = await Project.findById(projectId);
-    if (!project) return res.status(404).json({ error: 'Project not found' });
+    // PERFORMANCE: Using exists() instead of findById() for validation to avoid hydration overhead
+    const projectExists = await Project.exists({ _id: projectId });
+    if (!projectExists) return res.status(404).json({ error: 'Project not found' });
 
-    // 1. Create DPR
+    // 1. Instantiate DPR
     const newDPR = new DPR({
       ...dprData,
       project: projectId,
     });
-    await newDPR.save();
+
+    const tasks: Promise<any>[] = [
+      newDPR.save(),
+      Project.updateOne({ _id: projectId }, { $push: { dprs: newDPR._id } })
+    ];
 
     // 2. Auto-update BOQ executed quantity (if linked)
     if (dprData.linkedBoqId && dprData.workDoneQty) {
-      const boqItem = await BOQItem.findById(dprData.linkedBoqId);
-      if (boqItem) {
-        boqItem.executedQty += Number(dprData.workDoneQty);
-        await boqItem.save();
-      }
+      tasks.push(BOQItem.updateOne(
+        { _id: dprData.linkedBoqId },
+        { $inc: { executedQty: Number(dprData.workDoneQty) } }
+      ));
     }
 
     // 3. Auto-deduct material stock
     if (dprData.materialsUsed && dprData.materialsUsed.length > 0) {
+      // PERFORMANCE: Replace sequential save() calls with bulk updates
       for (const usage of dprData.materialsUsed) {
-        const material = await Material.findById(usage.materialId);
-        if (material) {
-          material.totalConsumed = (material.totalConsumed || 0) + Number(usage.qty);
-          material.currentStock = Math.max(0, (material.currentStock || 0) - Number(usage.qty));
-          await material.save();
-        }
+        tasks.push(Material.updateOne(
+          { _id: usage.materialId },
+          [
+            {
+              $set: {
+                totalConsumed: { $add: [{ $ifNull: ["$totalConsumed", 0] }, Number(usage.qty)] },
+                currentStock: {
+                  $max: [
+                    0,
+                    { $subtract: [{ $ifNull: ["$currentStock", 0] }, Number(usage.qty)] }
+                  ]
+                }
+              }
+            }
+          ]
+        ));
       }
     }
 
@@ -58,16 +73,14 @@ export const createDPR = async (req: Request, res: Response) => {
           amount: liabilityAmount,
           dueDate: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
         });
-        await newLiability.save();
 
-        project.liabilities.push(newLiability._id);
-        await project.save();
+        tasks.push(newLiability.save());
+        tasks.push(Project.updateOne({ _id: projectId }, { $push: { liabilities: newLiability._id } }));
       }
     }
 
-    // 5. Add DPR to project
-    project.dprs.push(newDPR._id);
-    await project.save();
+    // PERFORMANCE: Execute independent database operations in parallel
+    await Promise.all(tasks);
 
     res.status(201).json({
       success: true,
