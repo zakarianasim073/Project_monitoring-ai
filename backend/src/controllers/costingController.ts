@@ -4,10 +4,11 @@ import geminiService from '../services/geminiService';
 
 export const analyzeItemCost = async (req: Request, res: Response) => {
   try {
-    const { boqItemId } = req.params;
+    const { projectId, boqItemId } = req.params;
     const { materialCost, laborCost, equipmentCost, overheadCost } = req.body; // optional manual input
 
-    const item = await BOQItem.findById(boqItemId);
+    // SECURITY: Scope lookup by projectId (BOLA/IDOR protection)
+    const item = await BOQItem.findOne({ _id: boqItemId, project: projectId });
     if (!item) return res.status(404).json({ error: 'BOQ Item not found' });
 
     // AI Suggested Breakdown if not provided
