@@ -17,21 +17,25 @@ export const createBill = async (req: Request, res: Response) => {
     });
     await newBill.save();
 
-    project.bills.push(newBill._id);
-    await project.save();
+    // Performance optimization: use updateOne for project associations instead of save
+    await Project.updateOne(
+      { _id: projectId },
+      { $push: { bills: newBill._id } }
+    );
 
     // Auto-distribution for CLIENT_RA bills (if document attached)
     if (billData.type === 'CLIENT_RA' && billData.documentId) {
       // In real app, call Gemini to parse running bill and distribute to BOQ
       // For now, simple equal distribution as fallback
-      const activeBOQ = await BOQItem.find({ project: projectId, executedQty: { $gt: 0 } });
+      const activeBOQCount = await BOQItem.countDocuments({ project: projectId, executedQty: { $gt: 0 } });
       
-      if (activeBOQ.length > 0) {
-        const amountPerItem = billData.amount / activeBOQ.length;
-        for (const item of activeBOQ) {
-          item.billedAmount = (item.billedAmount || 0) + amountPerItem;
-          await item.save();
-        }
+      if (activeBOQCount > 0) {
+        const amountPerItem = billData.amount / activeBOQCount;
+        // Optimization: Use updateMany with $inc to avoid fetching and saving individual documents
+        await BOQItem.updateMany(
+          { project: projectId, executedQty: { $gt: 0 } },
+          { $inc: { billedAmount: amountPerItem } }
+        );
       }
     }
 
