@@ -22,30 +22,35 @@ export const createDPR = async (req: Request, res: Response) => {
     });
     await newDPR.save();
 
-    // 2. Auto-update BOQ executed quantity (if linked)
+    // 2. Auto-update BOQ executed quantity (if linked) - Atomic update
     if (dprData.linkedBoqId && dprData.workDoneQty) {
-      const boqItem = await BOQItem.findById(dprData.linkedBoqId);
-      if (boqItem) {
-        boqItem.executedQty += Number(dprData.workDoneQty);
-        await boqItem.save();
-      }
+      await BOQItem.updateOne(
+        { _id: dprData.linkedBoqId },
+        { $inc: { executedQty: Number(dprData.workDoneQty) } }
+      );
     }
 
-    // 3. Auto-deduct material stock
+    // 3. Auto-deduct material stock - Batch update using bulkWrite
     if (dprData.materialsUsed && dprData.materialsUsed.length > 0) {
-      for (const usage of dprData.materialsUsed) {
-        const material = await Material.findById(usage.materialId);
-        if (material) {
-          material.totalConsumed = (material.totalConsumed || 0) + Number(usage.qty);
-          material.currentStock = Math.max(0, (material.currentStock || 0) - Number(usage.qty));
-          await material.save();
+      const materialOps = dprData.materialsUsed.map((usage: any) => ({
+        updateOne: {
+          filter: { _id: usage.materialId },
+          update: {
+            $inc: {
+              totalConsumed: Number(usage.qty),
+              currentStock: -Number(usage.qty)
+            }
+          }
         }
-      }
+      }));
+      await Material.bulkWrite(materialOps);
     }
 
     // 4. Auto-create subcontractor liability (if linked)
+    const projectUpdates: any = { $push: { dprs: newDPR._id } };
+
     if (dprData.subContractorId && dprData.workDoneQty && dprData.linkedBoqId) {
-      const subCon = await SubContractor.findById(dprData.subContractorId);
+      const subCon = await SubContractor.findById(dprData.subContractorId).lean();
       if (subCon) {
         const rateObj = subCon.agreedRates.find(r => r.boqId === dprData.linkedBoqId);
         const rate = rateObj ? (rateObj.rate || 0) : 0;
@@ -60,14 +65,12 @@ export const createDPR = async (req: Request, res: Response) => {
         });
         await newLiability.save();
 
-        project.liabilities.push(newLiability._id);
-        await project.save();
+        projectUpdates.$push.liabilities = newLiability._id;
       }
     }
 
-    // 5. Add DPR to project
-    project.dprs.push(newDPR._id);
-    await project.save();
+    // 5. Consolidate Project updates into a single call
+    await Project.updateOne({ _id: projectId }, projectUpdates);
 
     res.status(201).json({
       success: true,
