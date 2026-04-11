@@ -1,0 +1,3 @@
+## 2026-04-15 - Optimizing Bill Creation and BOQ Distribution
+**Learning:** Sequential database operations for entity-parent creation (e.g., Bill -> Project) are an architectural requirement here to ensure integrity, but we can still optimize by using `.exists()` for validation and `updateOne` with `$push` to avoid full document hydration. Furthermore, N+1 update loops for sub-resources (like BOQ items) should be replaced with `countDocuments` + `updateMany({ $inc })` to reduce database roundtrips from O(N) to O(1).
+**Action:** Always prefer atomic `$inc` and `$push` operations for batch updates and use `.exists()` when only existence verification is needed. Maintain sequential flow for entity-parent links while optimizing the individual calls.
