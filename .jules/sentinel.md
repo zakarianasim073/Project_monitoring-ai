@@ -1,0 +1,4 @@
+## 2026-04-12 - BOLA/IDOR Protection in Project Controllers
+**Vulnerability:** Broken Object Level Authorization (BOLA) in `inventoryController.ts`, `dprController.ts`, and `costingController.ts`. Sub-resources (Materials, BOQItems, SubContractors, Bills) were being fetched by ID without verifying they belonged to the `projectId` provided in the request or authorized for the user.
+**Learning:** High-velocity development often leads to the use of simple `findById` lookups. Even with project-level middleware (`requireProjectRole`), failing to scope sub-resource lookups allows an authorized user of one project to potentially manipulate resources of another project if they can guess or obtain the resource ID.
+**Prevention:** Always use scoped lookups like `Model.findOne({ _id: id, project: projectId })` for any sub-resource associated with a project. Include `SECURITY:` comments to explain this pattern and prevent accidental regressions during refactoring.

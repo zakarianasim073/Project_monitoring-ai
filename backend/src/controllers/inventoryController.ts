@@ -7,11 +7,14 @@ export const receiveMaterial = async (req: Request, res: Response) => {
     const { projectId } = req.params;
     const { materialId, qty, rate } = req.body;
 
-    const project = await Project.findById(projectId);
-    if (!project) return res.status(404).json({ error: 'Project not found' });
+    // SECURITY: Parallel existence checks with scoped lookup to prevent BOLA/IDOR
+    const [projectExists, material] = await Promise.all([
+      Project.exists({ _id: projectId }),
+      Material.findOne({ _id: materialId, project: projectId })
+    ]);
 
-    const material = await Material.findById(materialId);
-    if (!material) return res.status(404).json({ error: 'Material not found' });
+    if (!projectExists) return res.status(404).json({ error: 'Project not found' });
+    if (!material) return res.status(404).json({ error: 'Material not found or access denied' });
 
     // Update stock
     material.totalReceived += Number(qty);
@@ -44,15 +47,18 @@ export const updatePDRemarks = async (req: Request, res: Response) => {
 
     let target: any = null;
 
+    // SECURITY: Scoped lookups using projectId to prevent BOLA/IDOR
     if (type === 'MATERIAL') {
-      target = await Material.findById(id);
+      target = await Material.findOne({ _id: id, project: projectId });
     } else if (type === 'SUBCONTRACTOR') {
-      target = await (await import('../models/SubContractor')).SubContractor.findById(id);
+      const { SubContractor } = await import('../models/SubContractor');
+      target = await SubContractor.findOne({ _id: id, project: projectId });
     } else if (type === 'BILL') {
-      target = await (await import('../models/Bill')).Bill.findById(id);
+      const { Bill } = await import('../models/Bill');
+      target = await Bill.findOne({ _id: id, project: projectId });
     }
 
-    if (!target) return res.status(404).json({ error: 'Item not found' });
+    if (!target) return res.status(404).json({ error: 'Item not found or access denied' });
 
     target.pdRemarks = remarks;
     await target.save();
