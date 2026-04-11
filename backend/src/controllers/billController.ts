@@ -15,25 +15,30 @@ export const createBill = async (req: Request, res: Response) => {
       ...billData,
       project: projectId,
     });
-    await newBill.save();
 
-    project.bills.push(newBill._id);
-    await project.save();
+    // ⚡ Bolt: Parallelize independent DB operations to reduce latency.
+    // Mongoose generates IDs locally, so we can use newBill._id immediately.
+    const tasks: Promise<any>[] = [
+      newBill.save(),
+      Project.updateOne({ _id: projectId }, { $push: { bills: newBill._id } })
+    ];
 
     // Auto-distribution for CLIENT_RA bills (if document attached)
     if (billData.type === 'CLIENT_RA' && billData.documentId) {
-      // In real app, call Gemini to parse running bill and distribute to BOQ
-      // For now, simple equal distribution as fallback
-      const activeBOQ = await BOQItem.find({ project: projectId, executedQty: { $gt: 0 } });
+      // ⚡ Bolt: Use .distinct() for faster ID retrieval and .lean() if possible.
+      const activeBOQIds = await BOQItem.find({ project: projectId, executedQty: { $gt: 0 } }).distinct('_id');
       
-      if (activeBOQ.length > 0) {
-        const amountPerItem = billData.amount / activeBOQ.length;
-        for (const item of activeBOQ) {
-          item.billedAmount = (item.billedAmount || 0) + amountPerItem;
-          await item.save();
-        }
+      if (activeBOQIds.length > 0) {
+        const amountPerItem = billData.amount / activeBOQIds.length;
+        // ⚡ Bolt: Use updateMany with $inc to batch update BOQ items in a single operation.
+        tasks.push(BOQItem.updateMany(
+          { _id: { $in: activeBOQIds } },
+          { $inc: { billedAmount: amountPerItem } }
+        ));
       }
     }
+
+    await Promise.all(tasks);
 
     res.status(201).json({
       success: true,

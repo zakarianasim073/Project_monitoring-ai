@@ -3,6 +3,30 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+/**
+ * Bolt: Helper to URL-encode the password segment of a MongoDB URI.
+ * This prevents EBADNAME errors caused by special characters like '@', '<', or '>'.
+ */
+const safeEncode = (uri: string) => {
+  if (!uri.includes('@')) return uri;
+
+  try {
+    const lastAtIndex = uri.lastIndexOf('@');
+    const firstPart = uri.substring(0, lastAtIndex);
+    const lastPart = uri.substring(lastAtIndex);
+
+    const protocolMatch = firstPart.match(/^(mongodb(?:\+srv)?:\/\/[^:]+:)(.*)$/);
+    if (!protocolMatch) return uri;
+
+    const protocolAndUser = protocolMatch[1];
+    const password = protocolMatch[2];
+
+    return `${protocolAndUser}${encodeURIComponent(password)}${lastPart}`;
+  } catch {
+    return uri;
+  }
+};
+
 export const connectDB = async () => {
   let uri = process.env.MONGO_URI || '';
   try {
@@ -10,8 +34,9 @@ export const connectDB = async () => {
       throw new Error('MONGO_URI is not defined in environment variables');
     }
 
-    // Clean up the URI from common copy-paste artifacts and trailing special characters
+    // Clean up and safely encode password
     uri = uri.trim().replace(/[^a-zA-Z0-9/?=&]+$/, '');
+    uri = safeEncode(uri);
 
     console.log('Connecting to MongoDB...');
 
