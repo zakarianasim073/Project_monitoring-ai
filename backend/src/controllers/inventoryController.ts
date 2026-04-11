@@ -1,16 +1,21 @@
 import { Request, Response } from 'express';
 import { Project } from '../models/Project';
 import { Material } from '../models/Material';
+import { SubContractor } from '../models/SubContractor';
+import { Bill } from '../models/Bill';
 
 export const receiveMaterial = async (req: Request, res: Response) => {
   try {
     const { projectId } = req.params;
     const { materialId, qty, rate } = req.body;
 
-    const project = await Project.findById(projectId);
-    if (!project) return res.status(404).json({ error: 'Project not found' });
+    // Parallelize existence checks and scope material by project for security
+    const [projectExists, material] = await Promise.all([
+      Project.exists({ _id: projectId }),
+      Material.findOne({ _id: materialId, project: projectId })
+    ]);
 
-    const material = await Material.findById(materialId);
+    if (!projectExists) return res.status(404).json({ error: 'Project not found' });
     if (!material) return res.status(404).json({ error: 'Material not found' });
 
     // Update stock
@@ -42,20 +47,22 @@ export const updatePDRemarks = async (req: Request, res: Response) => {
     const { projectId } = req.params;
     const { type, id, remarks } = req.body; // type: 'MATERIAL' | 'SUBCONTRACTOR' | 'BILL'
 
-    let target: any = null;
+    let result;
+    const filter = { _id: id, project: projectId };
+    const update = { pdRemarks: remarks };
 
+    // Use atomic updateOne to reduce DB round-trips and avoid document hydration
     if (type === 'MATERIAL') {
-      target = await Material.findById(id);
+      result = await Material.updateOne(filter, update);
     } else if (type === 'SUBCONTRACTOR') {
-      target = await (await import('../models/SubContractor')).SubContractor.findById(id);
+      result = await SubContractor.updateOne(filter, update);
     } else if (type === 'BILL') {
-      target = await (await import('../models/Bill')).Bill.findById(id);
+      result = await Bill.updateOne(filter, update);
     }
 
-    if (!target) return res.status(404).json({ error: 'Item not found' });
-
-    target.pdRemarks = remarks;
-    await target.save();
+    if (!result || result.matchedCount === 0) {
+      return res.status(404).json({ error: 'Item not found' });
+    }
 
     res.json({ success: true, message: 'Remarks updated by PD' });
 
