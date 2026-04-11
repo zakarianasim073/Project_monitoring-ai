@@ -7,22 +7,29 @@ export const receiveMaterial = async (req: Request, res: Response) => {
     const { projectId } = req.params;
     const { materialId, qty, rate } = req.body;
 
-    const project = await Project.findById(projectId);
-    if (!project) return res.status(404).json({ error: 'Project not found' });
+    // Use Promise.all to run existence checks in parallel
+    // Also scope material lookup by projectId for security (BOLA/IDOR prevention)
+    const [projectExists, material] = await Promise.all([
+      Project.exists({ _id: projectId }),
+      Material.findOne({ _id: materialId, project: projectId })
+    ]);
 
-    const material = await Material.findById(materialId);
+    if (!projectExists) return res.status(404).json({ error: 'Project not found' });
     if (!material) return res.status(404).json({ error: 'Material not found' });
 
-    // Update stock
-    material.totalReceived += Number(qty);
-    material.currentStock += Number(qty);
-    
+    const numQty = Number(qty);
+
     if (rate) {
-      // Update average rate (weighted average)
+      const numRate = Number(rate);
+      // Fixed weighted average logic: (oldVal + newVal) / newTotal
       const oldTotalValue = material.averageRate * material.totalReceived;
-      const newTotalValue = oldTotalValue + (Number(rate) * Number(qty));
-      material.averageRate = newTotalValue / material.totalReceived;
+      const newTotalReceived = material.totalReceived + numQty;
+      material.averageRate = (oldTotalValue + (numRate * numQty)) / newTotalReceived;
     }
+
+    // Update stock values
+    material.totalReceived += numQty;
+    material.currentStock += numQty;
 
     await material.save();
 
@@ -44,18 +51,24 @@ export const updatePDRemarks = async (req: Request, res: Response) => {
 
     let target: any = null;
 
+    let Model: any;
     if (type === 'MATERIAL') {
-      target = await Material.findById(id);
+      Model = Material;
     } else if (type === 'SUBCONTRACTOR') {
-      target = await (await import('../models/SubContractor')).SubContractor.findById(id);
+      Model = (await import('../models/SubContractor')).SubContractor;
     } else if (type === 'BILL') {
-      target = await (await import('../models/Bill')).Bill.findById(id);
+      Model = (await import('../models/Bill')).Bill;
     }
 
-    if (!target) return res.status(404).json({ error: 'Item not found' });
+    if (!Model) return res.status(400).json({ error: 'Invalid type' });
 
-    target.pdRemarks = remarks;
-    await target.save();
+    // Use updateOne for better performance when we don't need the document returned
+    const result = await Model.updateOne(
+      { _id: id, project: projectId },
+      { $set: { pdRemarks: remarks } }
+    );
+
+    if (result.matchedCount === 0) return res.status(404).json({ error: 'Item not found' });
 
     res.json({ success: true, message: 'Remarks updated by PD' });
 

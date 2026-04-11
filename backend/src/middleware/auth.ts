@@ -32,10 +32,11 @@ export const requireProjectRole = (allowedRoles: string[]) => {
     const { projectId } = req.params;
     if (!projectId) return next();
 
+    // Use .lean() for faster read-only check
     const member = await ProjectMember.findOne({
       project: projectId,
       user: req.user._id
-    });
+    }).lean();
 
     if (!member || !allowedRoles.includes(member.role)) {
       return res.status(403).json({ error: `Access denied. Required role: ${allowedRoles.join(', ')}` });
