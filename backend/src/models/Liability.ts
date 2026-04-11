@@ -12,4 +12,6 @@ const LiabilitySchema = new mongoose.Schema({
   dueDate: { type: String, required: true }
 }, { timestamps: true });
 
+LiabilitySchema.index({ project: 1 });
+
 export const Liability = mongoose.model('Liability', LiabilitySchema);

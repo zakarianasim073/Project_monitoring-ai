@@ -20,4 +20,6 @@ const ProjectDocumentSchema = new mongoose.Schema({
   isAnalyzed: { type: Boolean, default: false }
 }, { timestamps: true });
 
+ProjectDocumentSchema.index({ project: 1 });
+
 export const ProjectDocument = mongoose.model('ProjectDocument', ProjectDocumentSchema);

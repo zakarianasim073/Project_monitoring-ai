@@ -14,4 +14,6 @@ const SubContractorSchema = new mongoose.Schema({
   }]
 }, { timestamps: true });
 
+SubContractorSchema.index({ project: 1 });
+
 export const SubContractor = mongoose.model('SubContractor', SubContractorSchema);

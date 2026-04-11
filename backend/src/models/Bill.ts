@@ -14,4 +14,6 @@ const BillSchema = new mongoose.Schema({
   pdRemarks: String
 }, { timestamps: true });
 
+BillSchema.index({ project: 1 });
+
 export const Bill = mongoose.model('Bill', BillSchema);

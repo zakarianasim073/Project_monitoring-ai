@@ -1,0 +1,3 @@
+## 2024-05-24 - Optimization discovery
+**Learning:** Sequential database operations during `createDPR` (DPR creation, BOQ update, material stock updates) are a major performance bottleneck for large site reports. Missing `.lean()` on authorization queries results in unnecessary Mongoose document hydration on every API request. Lack of explicit indexes on the `project` field in most collections will lead to significant performance degradation as data grows.
+**Action:** Refactor `createDPR` to use `bulkWrite` and atomic operators with `Promise.all`. Add `.lean()` to the `requireProjectRole` middleware. Implement explicit database indexes for project-scoped lookups.
