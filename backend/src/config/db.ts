@@ -10,11 +10,25 @@ export const connectDB = async () => {
       throw new Error('MONGO_URI is not defined in environment variables');
     }
 
-    // Clean up the URI from common copy-paste artifacts and trailing special characters
-    uri = uri.trim().replace(/[^a-zA-Z0-9/?=&]+$/, '');
+    // Robustly handle special characters in credentials (e.g. '>') that cause SRV lookup errors
+    if (uri.includes('@')) {
+      const parts = uri.split('://');
+      const protocol = parts[0];
+      const rest = parts[1];
+
+      const lastAt = rest.lastIndexOf('@');
+      const auth = rest.substring(0, lastAt);
+      const hostAndParams = rest.substring(lastAt + 1);
+
+      if (auth.includes(':')) {
+        const [user, ...passParts] = auth.split(':');
+        const pass = passParts.join(':');
+        // Encode password to handle special chars like '>' correctly in the URI
+        uri = `${protocol}://${user}:${encodeURIComponent(pass)}@${hostAndParams}`;
+      }
+    }
 
     console.log('Connecting to MongoDB...');
-
     await mongoose.connect(uri);
     console.log('✅ MongoDB Connected');
   } catch (error) {
