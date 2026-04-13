@@ -1,0 +1,3 @@
+## 2026-04-13 - Login Page Micro-UX and Accessibility Improvements
+**Learning:** Adding role-specific 'Quick Login' buttons (e.g., Director, Engineer) on the login page significantly streamlines testing, demoing, and multi-user persona validation. Furthermore, small accessibility touches like `htmlFor` linkage and password toggles greatly improve the overall perceived quality and usability of the application without requiring major design overhauls.
+**Action:** Always include quick login buttons for demo environments and ensure base accessibility standards (labels, aria-labels) are met in every form component.
