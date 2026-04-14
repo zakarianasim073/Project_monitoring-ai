@@ -132,13 +132,16 @@ router.post(
         uploadDate: new Date().toISOString().split('T')[0]
       });
 
+      // SECURITY: Verify project existence before saving document
+      const projectExists = await Project.exists({ _id: req.params.projectId });
+      if (!projectExists) return res.status(404).json({ error: 'Project not found' });
+
       await newDoc.save();
 
-      const project = await Project.findById(req.params.projectId);
-      if (project) {
-        project.documents.push(newDoc._id);
-        await project.save();
-      }
+      await Project.updateOne(
+        { _id: req.params.projectId },
+        { $push: { documents: newDoc._id } }
+      );
 
       res.status(201).json(newDoc);
     } catch (error: any) {
