@@ -1,3 +1,3 @@
 ## 2026-04-15 - Enhanced Login Accessibility
-**Learning:** Adding 'Quick Login' buttons for demo accounts significantly improves the first-run experience and simplifies persona testing.
-**Action:** Use clickable demo access patterns for role-based applications.
+**Learning:** Proper label-input association using htmlFor/id is fundamental for screen reader accessibility and form usability.
+**Action:** Always verify form fields for correct label associations.
