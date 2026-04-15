@@ -8,8 +8,8 @@ export const createBill = async (req: Request, res: Response) => {
     const { projectId } = req.params;
     const billData = req.body;
 
-    const project = await Project.findById(projectId);
-    if (!project) return res.status(404).json({ error: 'Project not found' });
+    const projectExists = await Project.exists({ _id: projectId });
+    if (!projectExists) return res.status(404).json({ error: 'Project not found' });
 
     const newBill = new Bill({
       ...billData,
@@ -17,8 +17,7 @@ export const createBill = async (req: Request, res: Response) => {
     });
     await newBill.save();
 
-    project.bills.push(newBill._id);
-    await project.save();
+    await Project.updateOne({ _id: projectId }, { $push: { bills: newBill._id } });
 
     // Auto-distribution for CLIENT_RA bills (if document attached)
     if (billData.type === 'CLIENT_RA' && billData.documentId) {
@@ -28,10 +27,10 @@ export const createBill = async (req: Request, res: Response) => {
       
       if (activeBOQ.length > 0) {
         const amountPerItem = billData.amount / activeBOQ.length;
-        for (const item of activeBOQ) {
-          item.billedAmount = (item.billedAmount || 0) + amountPerItem;
-          await item.save();
-        }
+        await BOQItem.updateMany(
+          { _id: { $in: activeBOQ.map(item => item._id) } },
+          { $inc: { billedAmount: amountPerItem } }
+        );
       }
     }
 
