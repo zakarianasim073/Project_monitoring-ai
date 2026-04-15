@@ -1,0 +1,3 @@
+## 2026-04-12 - Optimizing Project and BOQ Updates in Bill Creation
+**Learning:** The `Project` model acts as a root aggregate with multiple large arrays (bills, dprs, documents), making `findById` and `save` extremely expensive due to full document hydration. Additionally, sequential updates to BOQ items in a loop create a classic N+1 bottleneck.
+**Action:** Use `Model.exists()` for existence checks and `Model.updateOne()` with atomic operators like `$push` or `$inc` to avoid hydrating large documents. Use `updateMany()` with `$inc` to batch updates to multiple related documents instead of looping through them.
