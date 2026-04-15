@@ -1,0 +1,3 @@
+## 2026-04-15 - DPR Creation Bottleneck & Atomic Clamping
+**Learning:** The `Project` model in this codebase is a large aggregate that triggers expensive hydration on `findById`. Additionally, sequential Material updates in a loop create a significant N+1 bottleneck. Using `Project.exists()` for validation and `Material.bulkWrite` for updates significantly reduces latency. Implementing stock clamping (`Math.max(0, ...)` logic) at the database level requires an aggregation pipeline within `bulkWrite`.
+**Action:** Always prefer `Model.exists()` for presence checks on the `Project` model. Use `bulkWrite` for multi-document updates and consolidate multiple parent-child link updates into a single atomic `updateOne` call.
