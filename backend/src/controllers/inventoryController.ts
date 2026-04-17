@@ -1,34 +1,42 @@
 import { Request, Response } from 'express';
 import { Project } from '../models/Project';
 import { Material } from '../models/Material';
+import { SubContractor } from '../models/SubContractor';
+import { Bill } from '../models/Bill';
 
 export const receiveMaterial = async (req: Request, res: Response) => {
   try {
     const { projectId } = req.params;
     const { materialId, qty, rate } = req.body;
 
-    const project = await Project.findById(projectId);
-    if (!project) return res.status(404).json({ error: 'Project not found' });
+    // Use Project.exists() for O(1) existence check as per repo standards
+    const projectExists = await Project.exists({ _id: projectId });
+    if (!projectExists) return res.status(404).json({ error: 'Project not found' });
 
-    const material = await Material.findById(materialId);
+    // BOLA protection: scope lookup by projectId
+    const material = await Material.findOne({ _id: materialId, project: projectId });
     if (!material) return res.status(404).json({ error: 'Material not found' });
 
-    // Update stock
-    material.totalReceived += Number(qty);
-    material.currentStock += Number(qty);
-    
+    const receivedQty = Number(qty);
+
     if (rate) {
-      // Update average rate (weighted average)
+      // Fix: Weighted average must use the current totalReceived BEFORE incrementing it
       const oldTotalValue = material.averageRate * material.totalReceived;
-      const newTotalValue = oldTotalValue + (Number(rate) * Number(qty));
+      const newTotalValue = oldTotalValue + (Number(rate) * receivedQty);
+
+      material.totalReceived += receivedQty;
       material.averageRate = newTotalValue / material.totalReceived;
+    } else {
+      material.totalReceived += receivedQty;
     }
+
+    material.currentStock += receivedQty;
 
     await material.save();
 
     res.json({
       success: true,
-      message: `Received ${qty} ${material.unit} of ${material.name}`,
+      message: `Received ${receivedQty} ${material.unit} of ${material.name}`,
       material
     });
 
@@ -44,12 +52,13 @@ export const updatePDRemarks = async (req: Request, res: Response) => {
 
     let target: any = null;
 
+    // BOLA protection: scope all lookups to the project from req.params
     if (type === 'MATERIAL') {
-      target = await Material.findById(id);
+      target = await Material.findOne({ _id: id, project: projectId });
     } else if (type === 'SUBCONTRACTOR') {
-      target = await (await import('../models/SubContractor')).SubContractor.findById(id);
+      target = await SubContractor.findOne({ _id: id, project: projectId });
     } else if (type === 'BILL') {
-      target = await (await import('../models/Bill')).Bill.findById(id);
+      target = await Bill.findOne({ _id: id, project: projectId });
     }
 
     if (!target) return res.status(404).json({ error: 'Item not found' });
