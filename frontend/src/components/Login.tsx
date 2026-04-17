@@ -64,7 +64,7 @@ const Login: React.FC = () => {
                 <input id="password" type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)}
                   className="w-full pl-11 pr-12 py-3 border border-slate-300 rounded-2xl focus:outline-none focus:border-blue-500"
                   placeholder="123456" required />
-                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-3.5 text-slate-400 hover:text-slate-600 focus:outline-none" aria-label={showPassword ? "Hide" : "Show"}>
+                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-3.5 text-slate-400 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded-lg p-0.5" aria-label={showPassword ? "Hide password" : "Show password"}>
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
