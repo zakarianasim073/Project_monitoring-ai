@@ -22,7 +22,17 @@ jobs:
       with:
         node-version: ${{ matrix.node-version }}
 
-    - name: Build
+    - name: Install pnpm
+      run: npm install -g pnpm
+
+    - name: Backend Build
       run: |
+        cd backend
         npm install
-        npx webpack
+        npm run build
+
+    - name: Frontend Build
+      run: |
+        cd frontend
+        pnpm install
+        pnpm build
