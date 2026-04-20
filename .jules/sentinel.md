@@ -1,0 +1,4 @@
+## 2025-05-14 - Widespread BOLA/IDOR in Project Sub-Resources
+**Vulnerability:** Sub-resources like Materials, BOQItems, SubContractors, and Bills were fetched using `findById(id)` without verifying they belonged to the current `projectId` context. This allowed users to potentially access or modify resources from other projects by manipulating IDs.
+**Learning:** In multi-tenant or multi-project architectures, relying solely on resource IDs is insufficient for authorization. Each access to a sub-resource must be explicitly scoped to the parent container (e.g., the project) that the user is authorized to access.
+**Prevention:** Always use `findOne({ _id: id, project: projectId })` instead of `findById(id)` for resources that belong to a project, especially in routes that are protected by project-level RBAC.
