@@ -18,7 +18,8 @@ export const protect = async (req: Request, res: Response, next: NextFunction) =
     if (!token) return res.status(401).json({ error: 'No token provided' });
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { userId: string };
-    req.user = await User.findById(decoded.userId).select('-password');
+    // Use .lean() for faster auth checks (no hydration)
+    req.user = await User.findById(decoded.userId).select('-password').lean();
     if (!req.user) return res.status(401).json({ error: 'User not found' });
 
     next();
@@ -32,10 +33,11 @@ export const requireProjectRole = (allowedRoles: string[]) => {
     const { projectId } = req.params;
     if (!projectId) return next();
 
+    // Use .lean() to skip hydration since we only need the 'role' field
     const member = await ProjectMember.findOne({
       project: projectId,
       user: req.user._id
-    });
+    }).lean();
 
     if (!member || !allowedRoles.includes(member.role)) {
       return res.status(403).json({ error: `Access denied. Required role: ${allowedRoles.join(', ')}` });
