@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import dotenv from 'dotenv';
 import { connectDB } from './config/db';
 import authRoutes from './routes/auth';
@@ -8,6 +9,9 @@ import projectRoutes from './routes/projects';
 dotenv.config();
 
 const app = express();
+
+// Set security HTTP headers
+app.use(helmet());
 
 app.use(cors({
   origin: ['http://localhost:5173', 'https://project-monitoring-sigma.vercel.app'],
