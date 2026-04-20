@@ -126,8 +126,14 @@ router.post(
       const { ProjectDocument } = await import('../models/ProjectDocument');
       const { Project } = await import('../models/Project');
 
+      const { name, type, category, module, size, url } = req.body;
       const newDoc = new ProjectDocument({
-        ...req.body,
+        name,
+        type,
+        category,
+        module,
+        size,
+        url,
         project: req.params.projectId,
         uploadDate: new Date().toISOString().split('T')[0]
       });
@@ -166,6 +172,7 @@ router.post(
 router.post(
   '/:projectId/ai/insights', 
   protect, 
+  requireProjectRole(['DIRECTOR', 'MANAGER', 'ENGINEER', 'ACCOUNTANT']),
   async (req, res) => {
     try {
       const { Project } = await import('../models/Project');
