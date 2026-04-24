@@ -1,0 +1,4 @@
+## 2026-04-12 - [Multi-tenant BOLA and Mass Assignment]
+**Vulnerability:** Found BOLA (Broken Object Level Authorization) in `inventoryController.ts` where resources were fetched by ID without checking project ownership. Also found a Mass Assignment vulnerability in `projects.ts` document upload using spread operators. Missing role check on AI insights route allowed unauthorized authenticated access.
+**Learning:** Spread operators in Mongoose models are dangerous as they allow users to inject internal fields (like `isAnalyzed` or even `project`). Unscoped `findById` calls in a multi-tenant app allow cross-tenant data access if IDs are leaked or guessed.
+**Prevention:** Always use explicit field whitelisting for model creation. Use `findOne({ _id: resourceId, project: projectId })` for all resource lookups in project-scoped routes. Apply `requireProjectRole` middleware to all project-specific endpoints.
