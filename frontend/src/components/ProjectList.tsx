@@ -71,10 +71,11 @@ const ProjectList: React.FC<ProjectListProps> = ({ onSwitchRole }) => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {projects.map((proj: any) => (
-          <div
+          <button
             key={proj.id}
             onClick={() => handleSelectProject(proj)}
-            className="bg-white rounded-3xl border border-slate-200 shadow-sm hover:shadow-xl transition-all cursor-pointer overflow-hidden group"
+            className="bg-white rounded-3xl border border-slate-200 shadow-sm hover:shadow-xl transition-all cursor-pointer overflow-hidden group w-full text-left focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
+            aria-label={`Open project: ${proj.name}`}
           >
             <div className="p-8">
               <div className="flex justify-between mb-6">
@@ -99,7 +100,7 @@ const ProjectList: React.FC<ProjectListProps> = ({ onSwitchRole }) => {
               <span className="font-medium text-slate-600 group-hover:text-blue-600">Open Project</span>
               <ArrowRight className="w-5 h-5 text-slate-400 group-hover:text-blue-600" />
             </div>
-          </div>
+          </button>
         ))}
       </div>
     </div>
