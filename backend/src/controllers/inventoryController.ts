@@ -7,22 +7,27 @@ export const receiveMaterial = async (req: Request, res: Response) => {
     const { projectId } = req.params;
     const { materialId, qty, rate } = req.body;
 
-    const project = await Project.findById(projectId);
-    if (!project) return res.status(404).json({ error: 'Project not found' });
+    // Use .exists() for faster validation
+    const projectExists = await Project.exists({ _id: projectId });
+    if (!projectExists) return res.status(404).json({ error: 'Project not found' });
 
-    const material = await Material.findById(materialId);
+    // BOLA protection: scope lookup by project
+    const material = await Material.findOne({ _id: materialId, project: projectId });
     if (!material) return res.status(404).json({ error: 'Material not found' });
 
-    // Update stock
-    material.totalReceived += Number(qty);
-    material.currentStock += Number(qty);
-    
     if (rate) {
-      // Update average rate (weighted average)
+      // Update average rate (weighted average) - calculate BEFORE incrementing totalReceived
       const oldTotalValue = material.averageRate * material.totalReceived;
       const newTotalValue = oldTotalValue + (Number(rate) * Number(qty));
+
+      material.totalReceived += Number(qty);
       material.averageRate = newTotalValue / material.totalReceived;
+    } else {
+      material.totalReceived += Number(qty);
     }
+
+    // Update stock
+    material.currentStock += Number(qty);
 
     await material.save();
 
@@ -44,12 +49,15 @@ export const updatePDRemarks = async (req: Request, res: Response) => {
 
     let target: any = null;
 
+    // BOLA protection: scope lookup by project
     if (type === 'MATERIAL') {
-      target = await Material.findById(id);
+      target = await Material.findOne({ _id: id, project: projectId });
     } else if (type === 'SUBCONTRACTOR') {
-      target = await (await import('../models/SubContractor')).SubContractor.findById(id);
+      const { SubContractor } = await import('../models/SubContractor');
+      target = await SubContractor.findOne({ _id: id, project: projectId });
     } else if (type === 'BILL') {
-      target = await (await import('../models/Bill')).Bill.findById(id);
+      const { Bill } = await import('../models/Bill');
+      target = await Bill.findOne({ _id: id, project: projectId });
     }
 
     if (!target) return res.status(404).json({ error: 'Item not found' });
