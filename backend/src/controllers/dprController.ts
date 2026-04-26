@@ -12,42 +12,58 @@ export const createDPR = async (req: Request, res: Response) => {
     const { projectId } = req.params;
     const dprData = req.body;
 
-    const project = await Project.findById(projectId);
-    if (!project) return res.status(404).json({ error: 'Project not found' });
+    // 1. Validate project existence (optimized)
+    // Using .exists() avoids full hydration of large project arrays
+    const projectExists = await Project.exists({ _id: projectId });
+    if (!projectExists) return res.status(404).json({ error: 'Project not found' });
 
-    // 1. Create DPR
+    // 2. Create DPR
     const newDPR = new DPR({
       ...dprData,
       project: projectId,
     });
     await newDPR.save();
 
-    // 2. Auto-update BOQ executed quantity (if linked)
+    // 3. Auto-update BOQ executed quantity (if linked) - Atomic update
+    // OPTIMIZATION: Use updateOne with $inc to avoid N+1 and hydration
     if (dprData.linkedBoqId && dprData.workDoneQty) {
-      const boqItem = await BOQItem.findById(dprData.linkedBoqId);
-      if (boqItem) {
-        boqItem.executedQty += Number(dprData.workDoneQty);
-        await boqItem.save();
-      }
+      await BOQItem.updateOne(
+        { _id: dprData.linkedBoqId },
+        { $inc: { executedQty: Number(dprData.workDoneQty) } }
+      );
     }
 
-    // 3. Auto-deduct material stock
+    // 4. Auto-deduct material stock (Bulk atomic update with zero-clamping)
+    // OPTIMIZATION: bulkWrite with aggregation pipeline eliminates N+1 queries and ensures atomic stock clamping
     if (dprData.materialsUsed && dprData.materialsUsed.length > 0) {
-      for (const usage of dprData.materialsUsed) {
-        const material = await Material.findById(usage.materialId);
-        if (material) {
-          material.totalConsumed = (material.totalConsumed || 0) + Number(usage.qty);
-          material.currentStock = Math.max(0, (material.currentStock || 0) - Number(usage.qty));
-          await material.save();
+      const materialOps = dprData.materialsUsed.map((usage: any) => ({
+        updateOne: {
+          filter: { _id: usage.materialId },
+          update: [
+            {
+              $set: {
+                totalConsumed: { $add: [{ $ifNull: ["$totalConsumed", 0] }, Number(usage.qty)] },
+                currentStock: {
+                  $max: [
+                    0,
+                    { $subtract: [{ $ifNull: ["$currentStock", 0] }, Number(usage.qty)] }
+                  ]
+                }
+              }
+            }
+          ]
         }
-      }
+      }));
+      await Material.bulkWrite(materialOps);
     }
 
-    // 4. Auto-create subcontractor liability (if linked)
+    // 5. Auto-create subcontractor liability (if linked)
+    let newLiabilityId = null;
     if (dprData.subContractorId && dprData.workDoneQty && dprData.linkedBoqId) {
-      const subCon = await SubContractor.findById(dprData.subContractorId);
+      // Optimized lookup: select only necessary fields
+      const subCon = await SubContractor.findById(dprData.subContractorId).select('agreedRates');
       if (subCon) {
-        const rateObj = subCon.agreedRates.find(r => r.boqId === dprData.linkedBoqId);
+        const rateObj = subCon.agreedRates.find((r: any) => r.boqId === dprData.linkedBoqId);
         const rate = rateObj ? (rateObj.rate || 0) : 0;
         const liabilityAmount = Number(dprData.workDoneQty) * rate;
 
@@ -59,15 +75,17 @@ export const createDPR = async (req: Request, res: Response) => {
           dueDate: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
         });
         await newLiability.save();
-
-        project.liabilities.push(newLiability._id);
-        await project.save();
+        newLiabilityId = newLiability._id;
       }
     }
 
-    // 5. Add DPR to project
-    project.dprs.push(newDPR._id);
-    await project.save();
+    // 6. Final Project Update (Atomic consolidation)
+    // OPTIMIZATION: Consolidate multiple updates into a single atomic Project.updateOne call
+    const projectUpdate: any = { $push: { dprs: newDPR._id } };
+    if (newLiabilityId) {
+      projectUpdate.$push.liabilities = newLiabilityId;
+    }
+    await Project.updateOne({ _id: projectId }, projectUpdate);
 
     res.status(201).json({
       success: true,
