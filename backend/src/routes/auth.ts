@@ -21,6 +21,21 @@ router.post('/login', async (req, res) => {
 
 router.post('/register', async (req, res) => {
   const { name, email, password } = req.body;
+
+  // Basic input validation
+  if (!name || name.trim().length < 2) {
+    return res.status(400).json({ error: 'Name must be at least 2 characters long' });
+  }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!email || !emailRegex.test(email)) {
+    return res.status(400).json({ error: 'Invalid email format' });
+  }
+
+  if (!password || password.length < 8) {
+    return res.status(400).json({ error: 'Password must be at least 8 characters long' });
+  }
+
   const existing = await User.findOne({ email });
   if (existing) return res.status(400).json({ error: 'User already exists' });
 
