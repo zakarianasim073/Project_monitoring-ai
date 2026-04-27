@@ -12,8 +12,9 @@ export const createDPR = async (req: Request, res: Response) => {
     const { projectId } = req.params;
     const dprData = req.body;
 
-    const project = await Project.findById(projectId);
-    if (!project) return res.status(404).json({ error: 'Project not found' });
+    // OPTIMIZATION: Use .exists() to avoid hydrating large project sub-document arrays
+    const projectExists = await Project.exists({ _id: projectId });
+    if (!projectExists) return res.status(404).json({ error: 'Project not found' });
 
     // 1. Create DPR
     const newDPR = new DPR({
@@ -22,25 +23,41 @@ export const createDPR = async (req: Request, res: Response) => {
     });
     await newDPR.save();
 
+    // Track IDs to push to project in a single update operation
+    const projectPushUpdates: any = { dprs: newDPR._id };
+
     // 2. Auto-update BOQ executed quantity (if linked)
+    // OPTIMIZATION: Use atomic update instead of findById + save
     if (dprData.linkedBoqId && dprData.workDoneQty) {
-      const boqItem = await BOQItem.findById(dprData.linkedBoqId);
-      if (boqItem) {
-        boqItem.executedQty += Number(dprData.workDoneQty);
-        await boqItem.save();
-      }
+      await BOQItem.updateOne(
+        { _id: dprData.linkedBoqId },
+        { $inc: { executedQty: Number(dprData.workDoneQty) } }
+      );
     }
 
     // 3. Auto-deduct material stock
+    // OPTIMIZATION: Use bulkWrite with aggregation pipeline for atomic updates and clamping at zero
+    // This eliminates the N+1 query problem and ensures data consistency in one roundtrip.
     if (dprData.materialsUsed && dprData.materialsUsed.length > 0) {
-      for (const usage of dprData.materialsUsed) {
-        const material = await Material.findById(usage.materialId);
-        if (material) {
-          material.totalConsumed = (material.totalConsumed || 0) + Number(usage.qty);
-          material.currentStock = Math.max(0, (material.currentStock || 0) - Number(usage.qty));
-          await material.save();
+      const materialOps = dprData.materialsUsed.map((usage: any) => ({
+        updateOne: {
+          filter: { _id: usage.materialId },
+          update: [
+            {
+              $set: {
+                totalConsumed: { $add: [{ $ifNull: ["$totalConsumed", 0] }, Number(usage.qty)] },
+                currentStock: {
+                  $max: [
+                    0,
+                    { $subtract: [{ $ifNull: ["$currentStock", 0] }, Number(usage.qty)] }
+                  ]
+                }
+              }
+            }
+          ]
         }
-      }
+      }));
+      await Material.bulkWrite(materialOps);
     }
 
     // 4. Auto-create subcontractor liability (if linked)
@@ -60,14 +77,13 @@ export const createDPR = async (req: Request, res: Response) => {
         });
         await newLiability.save();
 
-        project.liabilities.push(newLiability._id);
-        await project.save();
+        projectPushUpdates.liabilities = newLiability._id;
       }
     }
 
-    // 5. Add DPR to project
-    project.dprs.push(newDPR._id);
-    await project.save();
+    // 5. Add DPR (and Liability) to project
+    // OPTIMIZATION: Consolidated update to minimize database roundtrips
+    await Project.updateOne({ _id: projectId }, { $push: projectPushUpdates });
 
     res.status(201).json({
       success: true,
