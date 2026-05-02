@@ -1,28 +1,36 @@
 import { Request, Response } from 'express';
 import { Project } from '../models/Project';
 import { Material } from '../models/Material';
+import { SubContractor } from '../models/SubContractor';
+import { Bill } from '../models/Bill';
 
 export const receiveMaterial = async (req: Request, res: Response) => {
   try {
     const { projectId } = req.params;
     const { materialId, qty, rate } = req.body;
 
-    const project = await Project.findById(projectId);
-    if (!project) return res.status(404).json({ error: 'Project not found' });
+    // OPTIMIZATION: Use .exists() to avoid hydrating large project arrays
+    const projectExists = await Project.exists({ _id: projectId });
+    if (!projectExists) return res.status(404).json({ error: 'Project not found' });
 
     const material = await Material.findById(materialId);
     if (!material) return res.status(404).json({ error: 'Material not found' });
 
-    // Update stock
-    material.totalReceived += Number(qty);
-    material.currentStock += Number(qty);
-    
+    const incomingQty = Number(qty);
+    const incomingRate = Number(rate || 0);
+
     if (rate) {
-      // Update average rate (weighted average)
-      const oldTotalValue = material.averageRate * material.totalReceived;
-      const newTotalValue = oldTotalValue + (Number(rate) * Number(qty));
-      material.averageRate = newTotalValue / material.totalReceived;
+      // OPTIMIZATION: Fix calculation order to ensure accurate weighted average
+      const oldTotalReceived = material.totalReceived || 0;
+      const newTotalReceived = oldTotalReceived + incomingQty;
+      const oldTotalValue = (material.averageRate || 0) * oldTotalReceived;
+      const newTotalValue = oldTotalValue + (incomingRate * incomingQty);
+      material.averageRate = newTotalValue / newTotalReceived;
     }
+
+    // Update stock
+    material.totalReceived += incomingQty;
+    material.currentStock += incomingQty;
 
     await material.save();
 
@@ -42,20 +50,20 @@ export const updatePDRemarks = async (req: Request, res: Response) => {
     const { projectId } = req.params;
     const { type, id, remarks } = req.body; // type: 'MATERIAL' | 'SUBCONTRACTOR' | 'BILL'
 
-    let target: any = null;
+    // OPTIMIZATION: Use .exists() for project validation
+    const projectExists = await Project.exists({ _id: projectId });
+    if (!projectExists) return res.status(404).json({ error: 'Project not found' });
 
-    if (type === 'MATERIAL') {
-      target = await Material.findById(id);
-    } else if (type === 'SUBCONTRACTOR') {
-      target = await (await import('../models/SubContractor')).SubContractor.findById(id);
-    } else if (type === 'BILL') {
-      target = await (await import('../models/Bill')).Bill.findById(id);
-    }
+    // OPTIMIZATION: Avoid dynamic imports inside handlers and use atomic updateOne to avoid hydration
+    let Model: any;
+    if (type === 'MATERIAL') Model = Material;
+    else if (type === 'SUBCONTRACTOR') Model = SubContractor;
+    else if (type === 'BILL') Model = Bill;
 
-    if (!target) return res.status(404).json({ error: 'Item not found' });
+    if (!Model) return res.status(400).json({ error: 'Invalid type' });
 
-    target.pdRemarks = remarks;
-    await target.save();
+    const result = await Model.updateOne({ _id: id }, { $set: { pdRemarks: remarks } });
+    if (result.matchedCount === 0) return res.status(404).json({ error: 'Item not found' });
 
     res.json({ success: true, message: 'Remarks updated by PD' });
 
