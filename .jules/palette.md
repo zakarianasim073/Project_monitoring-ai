@@ -1,0 +1,3 @@
+## 2026-06-15 - Accessible Interaction Patterns in ProjectList
+**Learning:** Hover-based menus and non-semantic interactive `div` elements are recurring accessibility blockers in this codebase. They prevent keyboard navigation and provide no feedback to screen readers. Using semantic `button` tags with `focus-visible` styles and state-driven click toggles with ARIA attributes (`aria-expanded`, `aria-haspopup`) significantly improves the UX and accessibility.
+**Action:** Always favor semantic `button` elements for clickable cards and implement click-to-open logic for dropdowns with proper ARIA state management.
