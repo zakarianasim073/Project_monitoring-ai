@@ -1,28 +1,33 @@
 import { Request, Response } from 'express';
 import { Project } from '../models/Project';
 import { Material } from '../models/Material';
+import { SubContractor } from '../models/SubContractor';
+import { Bill } from '../models/Bill';
 
 export const receiveMaterial = async (req: Request, res: Response) => {
   try {
     const { projectId } = req.params;
     const { materialId, qty, rate } = req.body;
 
-    const project = await Project.findById(projectId);
-    if (!project) return res.status(404).json({ error: 'Project not found' });
+    // OPTIMIZATION: Use .exists() to avoid hydrating large project arrays
+    const projectExists = await Project.exists({ _id: projectId });
+    if (!projectExists) return res.status(404).json({ error: 'Project not found' });
 
     const material = await Material.findById(materialId);
     if (!material) return res.status(404).json({ error: 'Material not found' });
 
+    if (rate) {
+      // OPTIMIZATION & BUG FIX: Calculate oldTotalValue BEFORE updating totalReceived
+      // to ensure weighted average accuracy.
+      const oldTotalValue = material.averageRate * material.totalReceived;
+      const newTotalReceived = material.totalReceived + Number(qty);
+      const newTotalValue = oldTotalValue + (Number(rate) * Number(qty));
+      material.averageRate = newTotalValue / newTotalReceived;
+    }
+
     // Update stock
     material.totalReceived += Number(qty);
     material.currentStock += Number(qty);
-    
-    if (rate) {
-      // Update average rate (weighted average)
-      const oldTotalValue = material.averageRate * material.totalReceived;
-      const newTotalValue = oldTotalValue + (Number(rate) * Number(qty));
-      material.averageRate = newTotalValue / material.totalReceived;
-    }
 
     await material.save();
 
@@ -44,12 +49,13 @@ export const updatePDRemarks = async (req: Request, res: Response) => {
 
     let target: any = null;
 
+    // OPTIMIZATION: Removed dynamic imports to eliminate per-request overhead
     if (type === 'MATERIAL') {
       target = await Material.findById(id);
     } else if (type === 'SUBCONTRACTOR') {
-      target = await (await import('../models/SubContractor')).SubContractor.findById(id);
+      target = await SubContractor.findById(id);
     } else if (type === 'BILL') {
-      target = await (await import('../models/Bill')).Bill.findById(id);
+      target = await Bill.findById(id);
     }
 
     if (!target) return res.status(404).json({ error: 'Item not found' });
