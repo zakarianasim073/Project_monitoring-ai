@@ -1,28 +1,34 @@
 import { Request, Response } from 'express';
 import { Project } from '../models/Project';
 import { Material } from '../models/Material';
+import { SubContractor } from '../models/SubContractor';
+import { Bill } from '../models/Bill';
 
 export const receiveMaterial = async (req: Request, res: Response) => {
   try {
     const { projectId } = req.params;
     const { materialId, qty, rate } = req.body;
 
-    const project = await Project.findById(projectId);
-    if (!project) return res.status(404).json({ error: 'Project not found' });
+    // OPTIMIZATION: Use .exists() for existence check
+    const projectExists = await Project.exists({ _id: projectId });
+    if (!projectExists) return res.status(404).json({ error: 'Project not found' });
 
-    const material = await Material.findById(materialId);
+    const material = await Material.findOne({ _id: materialId, project: projectId });
     if (!material) return res.status(404).json({ error: 'Material not found' });
 
-    // Update stock
-    material.totalReceived += Number(qty);
-    material.currentStock += Number(qty);
-    
     if (rate) {
       // Update average rate (weighted average)
-      const oldTotalValue = material.averageRate * material.totalReceived;
+      // FIX: Calculate oldTotalValue BEFORE updating totalReceived
+      const oldTotalValue = (material.averageRate || 0) * (material.totalReceived || 0);
       const newTotalValue = oldTotalValue + (Number(rate) * Number(qty));
+      material.totalReceived += Number(qty);
       material.averageRate = newTotalValue / material.totalReceived;
+    } else {
+      material.totalReceived += Number(qty);
     }
+
+    // Update stock
+    material.currentStock += Number(qty);
 
     await material.save();
 
@@ -42,20 +48,26 @@ export const updatePDRemarks = async (req: Request, res: Response) => {
     const { projectId } = req.params;
     const { type, id, remarks } = req.body; // type: 'MATERIAL' | 'SUBCONTRACTOR' | 'BILL'
 
-    let target: any = null;
+    // OPTIMIZATION: Removed slow dynamic imports.
+    // OPTIMIZATION: Use updateOne for direct update instead of hydrating then saving.
+    let model: any = null;
 
     if (type === 'MATERIAL') {
-      target = await Material.findById(id);
+      model = Material;
     } else if (type === 'SUBCONTRACTOR') {
-      target = await (await import('../models/SubContractor')).SubContractor.findById(id);
+      model = SubContractor;
     } else if (type === 'BILL') {
-      target = await (await import('../models/Bill')).Bill.findById(id);
+      model = Bill;
     }
 
-    if (!target) return res.status(404).json({ error: 'Item not found' });
+    if (!model) return res.status(400).json({ error: 'Invalid type' });
 
-    target.pdRemarks = remarks;
-    await target.save();
+    const result = await model.updateOne(
+      { _id: id, project: projectId },
+      { $set: { pdRemarks: remarks } }
+    );
+
+    if (result.matchedCount === 0) return res.status(404).json({ error: 'Item not found' });
 
     res.json({ success: true, message: 'Remarks updated by PD' });
 
