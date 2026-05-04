@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, PlusCircle, Lock, Flag, ArrowRight, UserCircle } from 'lucide-react';
+import { Building2, PlusCircle, Lock, Flag, ArrowRight, UserCircle, ChevronDown } from 'lucide-react';
 import { ProjectState, UserRole, Priority } from '../types';
 import { api } from '../services/api';
 import { useNavigate } from 'react-router-dom';
@@ -11,6 +11,7 @@ interface ProjectListProps {
 const ProjectList: React.FC<ProjectListProps> = ({ onSwitchRole }) => {
   const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isRoleOpen, setIsRoleOpen] = useState(false);
   const navigate = useNavigate();
 
   const currentUserRole = localStorage.getItem('currentRole') || 'ENGINEER';
@@ -52,29 +53,51 @@ const ProjectList: React.FC<ProjectListProps> = ({ onSwitchRole }) => {
           <p className="text-slate-500 mt-2">Select a project to continue</p>
         </div>
         <div className="flex items-center gap-4">
-          <div className="relative group">
-            <button className="flex items-center gap-3 px-5 py-3 bg-white border border-slate-200 rounded-2xl hover:border-blue-400">
-              <UserCircle className="w-6 h-6" />
+          <div className="relative">
+            <button
+              onClick={() => setIsRoleOpen(!isRoleOpen)}
+              aria-haspopup="listbox"
+              aria-expanded={isRoleOpen}
+              aria-label="Switch User Role"
+              className="flex items-center gap-3 px-5 py-3 bg-white border border-slate-200 rounded-2xl hover:border-blue-400 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none transition-all"
+            >
+              <UserCircle className="w-6 h-6 text-slate-600" />
               <span className="font-medium">{currentUserRole}</span>
+              <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${isRoleOpen ? 'rotate-180' : ''}`} />
             </button>
             {/* Role switcher dropdown */}
-            <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded-2xl shadow-xl hidden group-hover:block z-50">
-              {(['DIRECTOR', 'MANAGER', 'ENGINEER', 'ACCOUNTANT'] as UserRole[]).map(role => (
-                <button key={role} onClick={() => onSwitchRole(role)} className="w-full text-left px-6 py-3 hover:bg-slate-50">
-                  {role}
-                </button>
-              ))}
-            </div>
+            {isRoleOpen && (
+              <div
+                role="listbox"
+                className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 py-2"
+              >
+                {(['DIRECTOR', 'MANAGER', 'ENGINEER', 'ACCOUNTANT'] as UserRole[]).map(role => (
+                  <button
+                    key={role}
+                    role="option"
+                    aria-selected={currentUserRole === role}
+                    onClick={() => {
+                      onSwitchRole(role);
+                      setIsRoleOpen(false);
+                    }}
+                    className="w-full text-left px-6 py-3 hover:bg-slate-50 focus:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 transition-colors"
+                  >
+                    {role}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {projects.map((proj: any) => (
-          <div
+          <button
             key={proj.id}
             onClick={() => handleSelectProject(proj)}
-            className="bg-white rounded-3xl border border-slate-200 shadow-sm hover:shadow-xl transition-all cursor-pointer overflow-hidden group"
+            aria-label={`Open project: ${proj.name}`}
+            className="text-left bg-white rounded-3xl border border-slate-200 shadow-sm hover:shadow-xl transition-all cursor-pointer overflow-hidden group focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
           >
             <div className="p-8">
               <div className="flex justify-between mb-6">
@@ -95,11 +118,11 @@ const ProjectList: React.FC<ProjectListProps> = ({ onSwitchRole }) => {
               </div>
             </div>
 
-            <div className="px-8 py-5 bg-slate-50 border-t flex justify-between items-center group-hover:bg-blue-50">
+            <div className="px-8 py-5 bg-slate-50 border-t flex justify-between items-center group-hover:bg-blue-50 transition-colors">
               <span className="font-medium text-slate-600 group-hover:text-blue-600">Open Project</span>
               <ArrowRight className="w-5 h-5 text-slate-400 group-hover:text-blue-600" />
             </div>
-          </div>
+          </button>
         ))}
       </div>
     </div>
