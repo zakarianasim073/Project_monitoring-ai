@@ -1,0 +1,4 @@
+## 2026-07-01 - Recurring BOLA and Mass Assignment Regressions
+**Vulnerability:** BOLA (Insecure Direct Object Reference) in `inventoryController.ts` and `dprController.ts` due to unscoped `findById` calls; Mass Assignment in `projects.ts` due to spread operator in document upload; Missing role-based access control on AI insights route.
+**Learning:** High-frequency routes frequently revert to insecure patterns (unscoped lookups and permissive object spreading), likely due to rapid feature iteration or lack of automated security regression tests in the CI pipeline.
+**Prevention:** Always scope resource lookups to the `projectId` from the request parameters. Use explicit field whitelisting instead of spread operators for model creation/updates. Ensure all project-specific routes have `requireProjectRole` middleware.
