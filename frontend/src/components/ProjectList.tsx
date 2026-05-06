@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, PlusCircle, Lock, Flag, ArrowRight, UserCircle } from 'lucide-react';
+import { Building2, PlusCircle, Lock, Flag, ArrowRight, UserCircle, ChevronDown } from 'lucide-react';
 import { ProjectState, UserRole, Priority } from '../types';
 import { api } from '../services/api';
 import { useNavigate } from 'react-router-dom';
@@ -11,6 +11,7 @@ interface ProjectListProps {
 const ProjectList: React.FC<ProjectListProps> = ({ onSwitchRole }) => {
   const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isRoleMenuOpen, setIsRoleMenuOpen] = useState(false);
   const navigate = useNavigate();
 
   const currentUserRole = localStorage.getItem('currentRole') || 'ENGINEER';
@@ -52,54 +53,70 @@ const ProjectList: React.FC<ProjectListProps> = ({ onSwitchRole }) => {
           <p className="text-slate-500 mt-2">Select a project to continue</p>
         </div>
         <div className="flex items-center gap-4">
-          <div className="relative group">
-            <button className="flex items-center gap-3 px-5 py-3 bg-white border border-slate-200 rounded-2xl hover:border-blue-400">
+          <div className="relative">
+            <button
+              onClick={() => setIsRoleMenuOpen(!isRoleMenuOpen)}
+              aria-haspopup="true"
+              aria-expanded={isRoleMenuOpen}
+              className="flex items-center gap-3 px-5 py-3 bg-white border border-slate-200 rounded-2xl hover:border-blue-400 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none"
+            >
               <UserCircle className="w-6 h-6" />
               <span className="font-medium">{currentUserRole}</span>
+              <ChevronDown className={`w-4 h-4 transition-transform ${isRoleMenuOpen ? 'rotate-180' : ''}`} />
             </button>
             {/* Role switcher dropdown */}
-            <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded-2xl shadow-xl hidden group-hover:block z-50">
-              {(['DIRECTOR', 'MANAGER', 'ENGINEER', 'ACCOUNTANT'] as UserRole[]).map(role => (
-                <button key={role} onClick={() => onSwitchRole(role)} className="w-full text-left px-6 py-3 hover:bg-slate-50">
-                  {role}
-                </button>
-              ))}
-            </div>
+            {isRoleMenuOpen && (
+              <div role="menu" className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 overflow-hidden">
+                {(['DIRECTOR', 'MANAGER', 'ENGINEER', 'ACCOUNTANT'] as UserRole[]).map(role => (
+                  <button
+                    key={role}
+                    role="menuitem"
+                    onClick={() => {
+                      onSwitchRole(role);
+                      setIsRoleMenuOpen(false);
+                    }}
+                    className="w-full text-left px-6 py-3 hover:bg-slate-50 transition-colors"
+                  >
+                    {role}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {projects.map((proj: any) => (
-          <div
+          <button
             key={proj.id}
             onClick={() => handleSelectProject(proj)}
-            className="bg-white rounded-3xl border border-slate-200 shadow-sm hover:shadow-xl transition-all cursor-pointer overflow-hidden group"
+            className="bg-white text-left rounded-3xl border border-slate-200 shadow-sm hover:shadow-xl transition-all cursor-pointer overflow-hidden group focus-visible:ring-2 focus-visible:ring-blue-500 outline-none"
           >
-            <div className="p-8">
-              <div className="flex justify-between mb-6">
-                <div className="p-4 bg-blue-100 text-blue-600 rounded-2xl">
+            <span className="p-8 w-full block">
+              <span className="flex justify-between mb-6">
+                <span className="p-4 bg-blue-100 text-blue-600 rounded-2xl">
                   <Building2 className="w-8 h-8" />
-                </div>
-                <div className={`px-4 py-1.5 rounded-full text-xs font-bold border ${getPriorityColor(proj.priority)}`}>
+                </span>
+                <span className={`px-4 py-1.5 rounded-full text-xs font-bold border ${getPriorityColor(proj.priority)}`}>
                   {proj.priority}
-                </div>
-              </div>
+                </span>
+              </span>
 
               <h3 className="text-2xl font-bold text-slate-900 mb-4 line-clamp-2">{proj.name}</h3>
 
-              <div className="space-y-3 text-sm text-slate-600">
-                <div>৳{(proj.contractValue / 1000000).toFixed(2)} Million</div>
-                <div>{proj.startDate} → {proj.endDate}</div>
-                <div>{proj.boq?.length || 0} BOQ Items</div>
-              </div>
-            </div>
+              <span className="space-y-3 text-sm text-slate-600 block">
+                <span className="block">৳{(proj.contractValue / 1000000).toFixed(2)} Million</span>
+                <span className="block">{proj.startDate} → {proj.endDate}</span>
+                <span className="block">{proj.boq?.length || 0} BOQ Items</span>
+              </span>
+            </span>
 
-            <div className="px-8 py-5 bg-slate-50 border-t flex justify-between items-center group-hover:bg-blue-50">
+            <span className="px-8 py-5 bg-slate-50 border-t flex justify-between items-center group-hover:bg-blue-50 w-full">
               <span className="font-medium text-slate-600 group-hover:text-blue-600">Open Project</span>
               <ArrowRight className="w-5 h-5 text-slate-400 group-hover:text-blue-600" />
-            </div>
-          </div>
+            </span>
+          </button>
         ))}
       </div>
     </div>
