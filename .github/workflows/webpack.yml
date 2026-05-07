@@ -32,6 +32,6 @@ jobs:
       run: |
         cd frontend
         npm install -g pnpm
-        echo "only-allow-trusted-dependencies=false" >> .npmrc
-        pnpm install
+        pnpm install --no-frozen-lockfile
+        pnpm approve-builds
         pnpm run build
