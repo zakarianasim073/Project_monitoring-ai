@@ -1,35 +1,48 @@
 import { Request, Response } from 'express';
 import { Project } from '../models/Project';
 import { Material } from '../models/Material';
+import { SubContractor } from '../models/SubContractor';
+import { Bill } from '../models/Bill';
 
 export const receiveMaterial = async (req: Request, res: Response) => {
   try {
     const { projectId } = req.params;
     const { materialId, qty, rate } = req.body;
 
-    const project = await Project.findById(projectId);
-    if (!project) return res.status(404).json({ error: 'Project not found' });
+    // BOLT OPTIMIZATION: Use exists() to avoid hydrating the massive Project aggregate root
+    const projectExists = await Project.exists({ _id: projectId });
+    if (!projectExists) return res.status(404).json({ error: 'Project not found' });
 
-    const material = await Material.findById(materialId);
-    if (!material) return res.status(404).json({ error: 'Material not found' });
+    // BOLT OPTIMIZATION: Use an atomic aggregation pipeline in findOneAndUpdate to:
+    // 1. Correctly calculate weighted average without race conditions
+    // 2. Update stock levels in one operation
+    // 3. Fix the logic flaw where totalReceived was incremented before the value calculation
+    const updatedMaterial = await Material.findOneAndUpdate(
+      { _id: materialId },
+      [
+        {
+          $set: {
+            // New Weighted Average = (oldAvg * oldQty + newReceiptVal) / (oldQty + newReceiptQty)
+            averageRate: rate ? {
+              $divide: [
+                { $add: [{ $multiply: ['$averageRate', '$totalReceived'] }, (Number(rate) * Number(qty))] },
+                { $add: ['$totalReceived', Number(qty)] }
+              ]
+            } : '$averageRate',
+            totalReceived: { $add: ['$totalReceived', Number(qty)] },
+            currentStock: { $add: ['$currentStock', Number(qty)] }
+          }
+        }
+      ],
+      { new: true }
+    );
 
-    // Update stock
-    material.totalReceived += Number(qty);
-    material.currentStock += Number(qty);
-    
-    if (rate) {
-      // Update average rate (weighted average)
-      const oldTotalValue = material.averageRate * material.totalReceived;
-      const newTotalValue = oldTotalValue + (Number(rate) * Number(qty));
-      material.averageRate = newTotalValue / material.totalReceived;
-    }
-
-    await material.save();
+    if (!updatedMaterial) return res.status(404).json({ error: 'Material not found' });
 
     res.json({
       success: true,
-      message: `Received ${qty} ${material.unit} of ${material.name}`,
-      material
+      message: `Received ${qty} ${updatedMaterial.unit} of ${updatedMaterial.name}`,
+      material: updatedMaterial
     });
 
   } catch (error: any) {
@@ -42,20 +55,17 @@ export const updatePDRemarks = async (req: Request, res: Response) => {
     const { projectId } = req.params;
     const { type, id, remarks } = req.body; // type: 'MATERIAL' | 'SUBCONTRACTOR' | 'BILL'
 
-    let target: any = null;
+    // BOLT OPTIMIZATION: Use a direct updateOne to avoid findById + save overhead
+    let model: any = null;
+    if (type === 'MATERIAL') model = Material;
+    else if (type === 'SUBCONTRACTOR') model = SubContractor;
+    else if (type === 'BILL') model = Bill;
 
-    if (type === 'MATERIAL') {
-      target = await Material.findById(id);
-    } else if (type === 'SUBCONTRACTOR') {
-      target = await (await import('../models/SubContractor')).SubContractor.findById(id);
-    } else if (type === 'BILL') {
-      target = await (await import('../models/Bill')).Bill.findById(id);
-    }
+    if (!model) return res.status(400).json({ error: 'Invalid type' });
 
-    if (!target) return res.status(404).json({ error: 'Item not found' });
+    const result = await model.updateOne({ _id: id }, { $set: { pdRemarks: remarks } });
 
-    target.pdRemarks = remarks;
-    await target.save();
+    if (result.matchedCount === 0) return res.status(404).json({ error: 'Item not found' });
 
     res.json({ success: true, message: 'Remarks updated by PD' });
 
