@@ -32,6 +32,5 @@ jobs:
       run: |
         cd frontend
         npm install -g pnpm
-        pnpm config set only-allow-trusted-dependencies false
-        pnpm install
+        pnpm install --ignore-scripts
         pnpm run build
