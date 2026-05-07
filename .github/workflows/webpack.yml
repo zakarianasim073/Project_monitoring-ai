@@ -32,6 +32,6 @@ jobs:
       run: |
         cd frontend
         npm install -g pnpm
-        pnpm config set only-allow-trusted-dependencies false
+        echo "only-allow-trusted-dependencies=false" >> .npmrc
         pnpm install
         pnpm run build
