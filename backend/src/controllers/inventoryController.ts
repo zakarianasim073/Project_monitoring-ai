@@ -59,7 +59,6 @@ export const updatePDRemarks = async (req: Request, res: Response) => {
     await target.save();
 
     res.json({ success: true, message: 'Remarks updated by PD' });
-
   } catch (error: any) {
     console.error(error);
     res.status(500).json({ error: 'Internal server error' });

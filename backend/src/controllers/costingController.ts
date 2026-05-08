@@ -64,7 +64,8 @@ export const analyzeItemCost = async (req: Request, res: Response) => {
     });
 
   } catch (error: any) {
-    console.error(error); res.status(500).json({ error: 'Internal server error' });
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
