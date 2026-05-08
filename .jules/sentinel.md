@@ -1,0 +1,4 @@
+## 2026-07-28 - Recurring BOLA and Mass Assignment Regressions
+**Vulnerability:** BOLA (Broken Object Level Authorization) via unscoped `findById` calls and Mass Assignment via spread operators in `ProjectDocument` creation.
+**Learning:** Security fixes for BOLA and Mass Assignment in this codebase are highly volatile and frequently regress during feature updates or performance optimizations (e.g., switching from `findById` to `exists` or direct updates). The `ProjectDocument` model is particularly vulnerable as it contains sensitive system-generated fields like `uploadDate` that can be overwritten if whitelisting is not strictly enforced.
+**Prevention:** Always use `findOne({ _id: id, project: projectId })` for sub-resources instead of `findById(id)`. Never use spread operators (`...req.body`) for model instantiation; use explicit field whitelisting. Use `requireProjectRole` middleware on all project-specific AI routes.
