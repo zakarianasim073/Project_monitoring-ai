@@ -7,7 +7,8 @@ export const analyzeItemCost = async (req: Request, res: Response) => {
     const { boqItemId } = req.params;
     const { materialCost, laborCost, equipmentCost, overheadCost } = req.body; // optional manual input
 
-    const item = await BOQItem.findById(boqItemId);
+    const { projectId } = req.params;
+    const item = await BOQItem.findOne({ _id: boqItemId, project: projectId });
     if (!item) return res.status(404).json({ error: 'BOQ Item not found' });
 
     // AI Suggested Breakdown if not provided
@@ -64,7 +65,7 @@ export const analyzeItemCost = async (req: Request, res: Response) => {
     });
 
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    console.error(error); res.status(500).json({ error: "Internal server error" });
   }
 };
 
