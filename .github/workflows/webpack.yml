@@ -31,6 +31,6 @@ jobs:
     - name: Build Frontend
       run: |
         cd frontend
-        npm install -g pnpm
-        pnpm install --no-frozen-lockfile
+        npm install -g pnpm@9
+        pnpm install
         pnpm run build
