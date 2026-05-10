@@ -32,5 +32,6 @@ jobs:
       run: |
         cd frontend
         npm install -g pnpm
-        pnpm install --no-frozen-lockfile
+        pnpm config set only-built-dependencies esbuild
+        pnpm install
         pnpm run build
