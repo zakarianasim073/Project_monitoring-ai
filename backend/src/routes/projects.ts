@@ -126,23 +126,32 @@ router.post(
       const { ProjectDocument } = await import('../models/ProjectDocument');
       const { Project } = await import('../models/Project');
 
+      // Explicit field whitelisting to prevent Mass Assignment
+      const { name, type, category, module, size, url } = req.body;
+
       const newDoc = new ProjectDocument({
-        ...req.body,
+        name,
+        type,
+        category,
+        module,
+        size,
+        url,
         project: req.params.projectId,
         uploadDate: new Date().toISOString().split('T')[0]
       });
 
       await newDoc.save();
 
-      const project = await Project.findById(req.params.projectId);
-      if (project) {
-        project.documents.push(newDoc._id);
-        await project.save();
-      }
+      // Atomic update to link document to project
+      await Project.updateOne(
+        { _id: req.params.projectId },
+        { $push: { documents: newDoc._id } }
+      );
 
       res.status(201).json(newDoc);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      console.error(error);
+      res.status(500).json({ error: 'Internal server error' });
     }
   }
 );
@@ -166,6 +175,7 @@ router.post(
 router.post(
   '/:projectId/ai/insights', 
   protect, 
+  requireProjectRole(['DIRECTOR', 'MANAGER', 'ENGINEER', 'ACCOUNTANT']),
   async (req, res) => {
     try {
       const { Project } = await import('../models/Project');
@@ -175,7 +185,8 @@ router.post(
       const insight = await geminiService.generateProjectInsights(project);
       res.json({ insight });
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      console.error(error);
+      res.status(500).json({ error: 'Internal server error' });
     }
   }
 );

@@ -7,24 +7,45 @@ export const receiveMaterial = async (req: Request, res: Response) => {
     const { projectId } = req.params;
     const { materialId, qty, rate } = req.body;
 
-    const project = await Project.findById(projectId);
-    if (!project) return res.status(404).json({ error: 'Project not found' });
+    // Use .exists() for faster validation
+    const projectExists = await Project.exists({ _id: projectId });
+    if (!projectExists) return res.status(404).json({ error: 'Project not found' });
 
-    const material = await Material.findById(materialId);
-    if (!material) return res.status(404).json({ error: 'Material not found' });
+    // Atomic update with aggregation pipeline to handle weighted average and prevent race conditions
+    const updatePipeline: any[] = [
+      {
+        $set: {
+          totalReceived: { $add: [{ $ifNull: ['$totalReceived', 0] }, Number(qty)] },
+          currentStock: { $add: [{ $ifNull: ['$currentStock', 0] }, Number(qty)] }
+        }
+      }
+    ];
 
-    // Update stock
-    material.totalReceived += Number(qty);
-    material.currentStock += Number(qty);
-    
     if (rate) {
-      // Update average rate (weighted average)
-      const oldTotalValue = material.averageRate * material.totalReceived;
-      const newTotalValue = oldTotalValue + (Number(rate) * Number(qty));
-      material.averageRate = newTotalValue / material.totalReceived;
+      updatePipeline.push({
+        $set: {
+          averageRate: {
+            $divide: [
+              {
+                $add: [
+                  { $multiply: [{ $ifNull: ['$averageRate', 0] }, { $subtract: ['$totalReceived', Number(qty)] }] },
+                  { $multiply: [Number(rate), Number(qty)] }
+                ]
+              },
+              '$totalReceived'
+            ]
+          }
+        }
+      });
     }
 
-    await material.save();
+    const material = await Material.findOneAndUpdate(
+      { _id: materialId, project: projectId },
+      updatePipeline,
+      { new: true }
+    );
+
+    if (!material) return res.status(404).json({ error: 'Material not found or not part of this project' });
 
     res.json({
       success: true,
@@ -33,7 +54,8 @@ export const receiveMaterial = async (req: Request, res: Response) => {
     });
 
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -42,25 +64,33 @@ export const updatePDRemarks = async (req: Request, res: Response) => {
     const { projectId } = req.params;
     const { type, id, remarks } = req.body; // type: 'MATERIAL' | 'SUBCONTRACTOR' | 'BILL'
 
-    let target: any = null;
+    let model: any = null;
 
     if (type === 'MATERIAL') {
-      target = await Material.findById(id);
+      model = Material;
     } else if (type === 'SUBCONTRACTOR') {
-      target = await (await import('../models/SubContractor')).SubContractor.findById(id);
+      model = (await import('../models/SubContractor')).SubContractor;
     } else if (type === 'BILL') {
-      target = await (await import('../models/Bill')).Bill.findById(id);
+      model = (await import('../models/Bill')).Bill;
     }
 
-    if (!target) return res.status(404).json({ error: 'Item not found' });
+    if (!model) return res.status(400).json({ error: 'Invalid type' });
 
-    target.pdRemarks = remarks;
-    await target.save();
+    // Scope lookup to projectId to fix BOLA
+    const result = await model.updateOne(
+      { _id: id, project: projectId },
+      { $set: { pdRemarks: remarks } }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ error: 'Item not found or not part of this project' });
+    }
 
     res.json({ success: true, message: 'Remarks updated by PD' });
 
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
