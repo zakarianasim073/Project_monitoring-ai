@@ -163,7 +163,7 @@ router.post(
 router.post(
   '/:projectId/ai/extract-dpr', 
   protect, 
-  requireProjectRole(['ENGINEER', 'DIRECTOR']), 
+  requireProjectRole(['ENGINEER', 'DIRECTOR', 'MANAGER']),
   async (req, res) => {
     try {
       const { documentName, boqItems } = req.body;
