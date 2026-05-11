@@ -33,7 +33,8 @@ router.post(
         placedData: parsed
       });
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      console.error('Error in smart upload:', error);
+      res.status(500).json({ error: 'Internal server error' });
     }
   }
 );
@@ -59,7 +60,8 @@ router.get('/my-projects', protect, async (req, res) => {
 
     res.json(projects);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    console.error('Error fetching projects:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -80,7 +82,8 @@ router.get('/:projectId', protect, requireProjectRole(['DIRECTOR', 'MANAGER', 'E
 
     res.json(project);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    console.error('Error fetching project:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -126,8 +129,16 @@ router.post(
       const { ProjectDocument } = await import('../models/ProjectDocument');
       const { Project } = await import('../models/Project');
 
+      // Security: Whitelist fields to prevent mass assignment
+      const { name, type, category, module, size, url } = req.body;
+
       const newDoc = new ProjectDocument({
-        ...req.body,
+        name,
+        type,
+        category,
+        module,
+        size,
+        url,
         project: req.params.projectId,
         uploadDate: new Date().toISOString().split('T')[0]
       });
@@ -142,7 +153,8 @@ router.post(
 
       res.status(201).json(newDoc);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      console.error('Error uploading document:', error);
+      res.status(500).json({ error: 'Internal server error' });
     }
   }
 );
@@ -158,7 +170,8 @@ router.post(
       const extracted = await geminiService.extractDPRData(documentName, boqItems);
       res.json(extracted);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      console.error('Error extracting DPR data:', error);
+      res.status(500).json({ error: 'Internal server error' });
     }
   }
 );
@@ -166,6 +179,7 @@ router.post(
 router.post(
   '/:projectId/ai/insights', 
   protect, 
+  requireProjectRole(['DIRECTOR', 'MANAGER', 'ENGINEER', 'ACCOUNTANT']),
   async (req, res) => {
     try {
       const { Project } = await import('../models/Project');
@@ -175,7 +189,8 @@ router.post(
       const insight = await geminiService.generateProjectInsights(project);
       res.json({ insight });
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      console.error('Error generating insights:', error);
+      res.status(500).json({ error: 'Internal server error' });
     }
   }
 );
@@ -190,7 +205,8 @@ router.post(
       const extracted = await geminiService.extractBillData(documentName);
       res.json(extracted);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      console.error('Error extracting bill data:', error);
+      res.status(500).json({ error: 'Internal server error' });
     }
   }
 );
