@@ -76,8 +76,8 @@ export const createDPR = async (req: Request, res: Response) => {
     });
 
   } catch (error: any) {
-    console.error(error);
-    res.status(500).json({ error: error.message });
+    console.error('Error creating DPR:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
