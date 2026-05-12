@@ -1,3 +1,7 @@
 ## 2025-05-15 - Optimizing Bill Creation and BOQ Distribution
 **Learning:** The `Project` model in this application acts as a root aggregate with many large sub-document arrays. Using `findById` triggers full hydration of these arrays, which is inefficient for simple existence checks. Additionally, updating BOQ items in a loop with `.save()` creates an N+1 query problem, significantly slowing down bill processing as the number of BOQ items grows.
 **Action:** Use `Model.exists()` for presence validation and `updateMany` with atomic operators like `$inc` for bulk updates to eliminate N+1 overhead and minimize database roundtrips.
+
+## 2026-05-12 - Atomic Inventory Updates and Race Condition Prevention
+**Learning:** High-frequency inventory operations like `receiveMaterial` are prone to race conditions and performance bottlenecks when using the "find-modify-save" pattern. Document hydration of the `Project` model during simple existence checks adds unnecessary overhead. Furthermore, weighted average calculations performed in application logic can be buggy if they rely on stale or partially updated state.
+**Action:** Use an atomic `findOneAndUpdate` with an aggregation pipeline to perform calculations and updates directly on the database. Replace `findById` with `exists()` for existence checks, and use static imports instead of dynamic ones in hot request paths to minimize per-request latency.
