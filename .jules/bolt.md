@@ -1,3 +1,7 @@
 ## 2025-05-15 - Optimizing Bill Creation and BOQ Distribution
 **Learning:** The `Project` model in this application acts as a root aggregate with many large sub-document arrays. Using `findById` triggers full hydration of these arrays, which is inefficient for simple existence checks. Additionally, updating BOQ items in a loop with `.save()` creates an N+1 query problem, significantly slowing down bill processing as the number of BOQ items grows.
 **Action:** Use `Model.exists()` for presence validation and `updateMany` with atomic operators like `$inc` for bulk updates to eliminate N+1 overhead and minimize database roundtrips.
+
+## 2025-05-16 - Atomic Weighted Average and Hydration Minimization
+**Learning:** In `inventoryController.ts`, updating material stock and average rate via read-modify-write (`findById` then `save()`) was prone to race conditions and unnecessary hydration of the full document. Furthermore, the weighted average calculation was mathematically flawed when done sequentially after updating the total quantity. Dynamic imports within route handlers also added per-request overhead.
+**Action:** Use `findOneAndUpdate` with an aggregation pipeline to perform atomic calculations (like weighted average) in a single database step. Replace `findById` with `exists` for validation and `updateOne` for simple field updates to avoid the overhead of full document hydration. Move dynamic imports to the top level.
