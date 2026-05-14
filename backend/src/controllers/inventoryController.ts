@@ -1,39 +1,56 @@
 import { Request, Response } from 'express';
 import { Project } from '../models/Project';
 import { Material } from '../models/Material';
+import { SubContractor } from '../models/SubContractor';
+import { Bill } from '../models/Bill';
 
 export const receiveMaterial = async (req: Request, res: Response) => {
   try {
     const { projectId } = req.params;
     const { materialId, qty, rate } = req.body;
 
-    const project = await Project.findById(projectId);
-    if (!project) return res.status(404).json({ error: 'Project not found' });
+    // Faster validation without hydrating large project arrays
+    const projectExists = await Project.exists({ _id: projectId });
+    if (!projectExists) return res.status(404).json({ error: 'Project not found' });
 
-    const material = await Material.findById(materialId);
-    if (!material) return res.status(404).json({ error: 'Material not found' });
+    // Atomic update using aggregation pipeline to prevent race conditions and N+1 hydration
+    // Formula: (oldAverage * oldTotal + newRate * newQty) / (oldTotal + newQty)
+    const updatedMaterial = await Material.findOneAndUpdate(
+      { _id: materialId, project: projectId },
+      [
+        {
+          $set: {
+            averageRate: {
+              $cond: {
+                if: { $gt: [Number(rate || 0), 0] },
+                then: {
+                  $divide: [
+                    { $add: [{ $multiply: ["$averageRate", "$totalReceived"] }, (Number(rate || 0) * Number(qty))] },
+                    { $add: ["$totalReceived", Number(qty)] }
+                  ]
+                },
+                else: "$averageRate"
+              }
+            },
+            totalReceived: { $add: ["$totalReceived", Number(qty)] },
+            currentStock: { $add: ["$currentStock", Number(qty)] }
+          }
+        }
+      ],
+      { new: true }
+    );
 
-    // Update stock
-    material.totalReceived += Number(qty);
-    material.currentStock += Number(qty);
-    
-    if (rate) {
-      // Update average rate (weighted average)
-      const oldTotalValue = material.averageRate * material.totalReceived;
-      const newTotalValue = oldTotalValue + (Number(rate) * Number(qty));
-      material.averageRate = newTotalValue / material.totalReceived;
-    }
-
-    await material.save();
+    if (!updatedMaterial) return res.status(404).json({ error: 'Material not found' });
 
     res.json({
       success: true,
-      message: `Received ${qty} ${material.unit} of ${material.name}`,
-      material
+      message: `Received ${qty} ${updatedMaterial.unit} of ${updatedMaterial.name}`,
+      material: updatedMaterial
     });
 
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -42,25 +59,29 @@ export const updatePDRemarks = async (req: Request, res: Response) => {
     const { projectId } = req.params;
     const { type, id, remarks } = req.body; // type: 'MATERIAL' | 'SUBCONTRACTOR' | 'BILL'
 
-    let target: any = null;
+    let result: any = null;
+
+    // Use updateOne to avoid unnecessary document hydration and N+1 query patterns
+    const update = { $set: { pdRemarks: remarks } };
+    const query = { _id: id, project: projectId };
 
     if (type === 'MATERIAL') {
-      target = await Material.findById(id);
+      result = await Material.updateOne(query, update);
     } else if (type === 'SUBCONTRACTOR') {
-      target = await (await import('../models/SubContractor')).SubContractor.findById(id);
+      result = await SubContractor.updateOne(query, update);
     } else if (type === 'BILL') {
-      target = await (await import('../models/Bill')).Bill.findById(id);
+      result = await Bill.updateOne(query, update);
     }
 
-    if (!target) return res.status(404).json({ error: 'Item not found' });
-
-    target.pdRemarks = remarks;
-    await target.save();
+    if (!result || result.matchedCount === 0) {
+      return res.status(404).json({ error: 'Item not found' });
+    }
 
     res.json({ success: true, message: 'Remarks updated by PD' });
 
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
