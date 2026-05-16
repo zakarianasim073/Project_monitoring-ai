@@ -1,0 +1,4 @@
+## 2025-05-14 - Scoping Sub-resources for BOLA Prevention
+**Vulnerability:** Insecure Direct Object Reference (BOLA/IDOR) in DPR and Inventory controllers where sub-resources (Material, BOQItem, SubContractor) were queried solely by `_id` without verifying they belonged to the `projectId` provided in the URL.
+**Learning:** Even when a route is protected by project-level role checks, sub-resource lookups within the handler must still be explicitly scoped to the project to prevent cross-project data access or manipulation by authenticated users who change the resource ID in the request body.
+**Prevention:** Always use `findOne({ _id: resourceId, project: projectId })` instead of `findById(resourceId)` in project-scoped controllers. Standardize on generic 'Internal server error' responses to prevent schema/internal detail leakage via `error.message`.
