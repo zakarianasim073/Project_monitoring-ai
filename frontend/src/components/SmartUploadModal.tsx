@@ -1,11 +1,19 @@
-import React, { useState } from 'react';
-import { UploadCloud, Loader2, Sparkles, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { UploadCloud, Loader2, Sparkles, CheckCircle2, X } from 'lucide-react';
 import { api } from '../services/api';
 
 const SmartUploadModal = ({ projectId, isOpen, onClose, onSuccess }: any) => {
   const [file, setFile] = useState<File | null>(null);
   const [processing, setProcessing] = useState(false);
   const [result, setResult] = useState<any>(null);
+
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !processing) onClose();
+    };
+    if (isOpen) window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [isOpen, onClose, processing]);
 
   const handleSmartUpload = async () => {
     if (!file) return;
@@ -38,8 +46,24 @@ const SmartUploadModal = ({ projectId, isOpen, onClose, onSuccess }: any) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80">
-      <div className="bg-white rounded-3xl w-full max-w-md p-8">
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4"
+      onClick={() => !processing && onClose()}
+    >
+      <div
+        className="bg-white rounded-3xl w-full max-w-md p-8 relative"
+        onClick={e => e.stopPropagation()}
+      >
+        {!processing && (
+          <button
+            onClick={onClose}
+            className="absolute right-6 top-6 text-slate-400 hover:text-slate-600 transition-colors p-2 hover:bg-slate-100 rounded-full"
+            aria-label="Close modal"
+          >
+            <X className="w-6 h-6" />
+          </button>
+        )}
+
         <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
           <Sparkles className="text-emerald-600" /> Smart Document Import
         </h2>
@@ -55,14 +79,23 @@ const SmartUploadModal = ({ projectId, isOpen, onClose, onSuccess }: any) => {
 
         {file && <p className="mt-4 text-sm text-center text-emerald-600">{file.name}</p>}
 
-        <button 
-          onClick={handleSmartUpload}
-          disabled={!file || processing}
-          className="mt-8 w-full py-4 bg-emerald-600 text-white rounded-2xl font-bold flex items-center justify-center gap-2 disabled:bg-slate-300"
-        >
-          {processing ? <Loader2 className="animate-spin" /> : <Sparkles />}
-          {processing ? "AI Analyzing & Placing..." : "Smart Import Now"}
-        </button>
+        <div className="flex gap-4 mt-8">
+          <button
+            onClick={onClose}
+            disabled={processing}
+            className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold hover:bg-slate-200 transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSmartUpload}
+            disabled={!file || processing}
+            className="flex-[2] py-4 bg-emerald-600 text-white rounded-2xl font-bold flex items-center justify-center gap-2 disabled:bg-slate-300 transition-all"
+          >
+            {processing ? <Loader2 className="animate-spin" /> : <Sparkles />}
+            {processing ? "AI Analyzing & Placing..." : "Smart Import Now"}
+          </button>
+        </div>
       </div>
     </div>
   );
