@@ -12,8 +12,11 @@ export const createDPR = async (req: Request, res: Response) => {
     const { projectId } = req.params;
     const dprData = req.body;
 
-    const project = await Project.findById(projectId);
-    if (!project) return res.status(404).json({ error: 'Project not found' });
+    // OPTIMIZATION: Use .exists() to avoid expensive hydration of large project arrays
+    const projectExists = await Project.exists({ _id: projectId });
+    if (!projectExists) return res.status(404).json({ error: 'Project not found' });
+
+    const projectPush: any = {};
 
     // 1. Create DPR
     const newDPR = new DPR({
@@ -21,31 +24,42 @@ export const createDPR = async (req: Request, res: Response) => {
       project: projectId,
     });
     await newDPR.save();
+    projectPush.dprs = newDPR._id;
 
     // 2. Auto-update BOQ executed quantity (if linked)
+    // OPTIMIZATION: Use atomic update with $inc to eliminate findById + save()
     if (dprData.linkedBoqId && dprData.workDoneQty) {
-      const boqItem = await BOQItem.findById(dprData.linkedBoqId);
-      if (boqItem) {
-        boqItem.executedQty += Number(dprData.workDoneQty);
-        await boqItem.save();
-      }
+      await BOQItem.updateOne(
+        { _id: dprData.linkedBoqId },
+        { $inc: { executedQty: Number(dprData.workDoneQty) } }
+      );
     }
 
     // 3. Auto-deduct material stock
+    // OPTIMIZATION: Use bulkWrite to eliminate N+1 queries (lookup + save per material)
     if (dprData.materialsUsed && dprData.materialsUsed.length > 0) {
-      for (const usage of dprData.materialsUsed) {
-        const material = await Material.findById(usage.materialId);
-        if (material) {
-          material.totalConsumed = (material.totalConsumed || 0) + Number(usage.qty);
-          material.currentStock = Math.max(0, (material.currentStock || 0) - Number(usage.qty));
-          await material.save();
+      const materialOps = dprData.materialsUsed.map((usage: any) => ({
+        updateOne: {
+          filter: { _id: usage.materialId },
+          update: [
+            {
+              $set: {
+                totalConsumed: { $add: [{ $ifNull: ["$totalConsumed", 0] }, Number(usage.qty)] },
+                currentStock: {
+                  $max: [0, { $subtract: [{ $ifNull: ["$currentStock", 0] }, Number(usage.qty)] }]
+                }
+              }
+            }
+          ]
         }
-      }
+      }));
+      await Material.bulkWrite(materialOps);
     }
 
     // 4. Auto-create subcontractor liability (if linked)
     if (dprData.subContractorId && dprData.workDoneQty && dprData.linkedBoqId) {
-      const subCon = await SubContractor.findById(dprData.subContractorId);
+      // OPTIMIZATION: Use .select() to minimize data transfer and hydration
+      const subCon = await SubContractor.findById(dprData.subContractorId).select('agreedRates');
       if (subCon) {
         const rateObj = subCon.agreedRates.find(r => r.boqId === dprData.linkedBoqId);
         const rate = rateObj ? (rateObj.rate || 0) : 0;
@@ -59,15 +73,19 @@ export const createDPR = async (req: Request, res: Response) => {
           dueDate: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
         });
         await newLiability.save();
-
-        project.liabilities.push(newLiability._id);
-        await project.save();
+        projectPush.liabilities = newLiability._id;
       }
     }
 
-    // 5. Add DPR to project
-    project.dprs.push(newDPR._id);
-    await project.save();
+    // 5. Consolidated Project Update
+    // OPTIMIZATION: Single updateOne replaces multiple .save() calls and redundant hydration
+    if (Object.keys(projectPush).length > 0) {
+      const pushEach: any = {};
+      for (const [key, value] of Object.entries(projectPush)) {
+        pushEach[key] = { $each: [value] };
+      }
+      await Project.updateOne({ _id: projectId }, { $push: pushEach });
+    }
 
     res.status(201).json({
       success: true,
@@ -76,8 +94,9 @@ export const createDPR = async (req: Request, res: Response) => {
     });
 
   } catch (error: any) {
+    // OPTIMIZATION: Standardize generic 500 error and console log actual error
     console.error(error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
