@@ -7,11 +7,12 @@ export const receiveMaterial = async (req: Request, res: Response) => {
     const { projectId } = req.params;
     const { materialId, qty, rate } = req.body;
 
-    const project = await Project.findById(projectId);
-    if (!project) return res.status(404).json({ error: 'Project not found' });
+    const projectExists = await Project.exists({ _id: projectId });
+    if (!projectExists) return res.status(404).json({ error: 'Project not found' });
 
-    const material = await Material.findById(materialId);
-    if (!material) return res.status(404).json({ error: 'Material not found' });
+    // BOLA FIX: Ensure material belongs to the project
+    const material = await Material.findOne({ _id: materialId, project: projectId });
+    if (!material) return res.status(404).json({ error: 'Material not found in this project' });
 
     // Update stock
     material.totalReceived += Number(qty);
@@ -19,9 +20,9 @@ export const receiveMaterial = async (req: Request, res: Response) => {
     
     if (rate) {
       // Update average rate (weighted average)
-      const oldTotalValue = material.averageRate * material.totalReceived;
+      const oldTotalValue = material.averageRate * (material.totalReceived - Number(qty));
       const newTotalValue = oldTotalValue + (Number(rate) * Number(qty));
-      material.averageRate = newTotalValue / material.totalReceived;
+      material.averageRate = material.totalReceived > 0 ? newTotalValue / material.totalReceived : 0;
     }
 
     await material.save();
@@ -33,7 +34,8 @@ export const receiveMaterial = async (req: Request, res: Response) => {
     });
 
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -44,15 +46,18 @@ export const updatePDRemarks = async (req: Request, res: Response) => {
 
     let target: any = null;
 
+    // BOLA FIX: Ensure target belongs to the project
     if (type === 'MATERIAL') {
-      target = await Material.findById(id);
+      target = await Material.findOne({ _id: id, project: projectId });
     } else if (type === 'SUBCONTRACTOR') {
-      target = await (await import('../models/SubContractor')).SubContractor.findById(id);
+      const { SubContractor } = await import('../models/SubContractor');
+      target = await SubContractor.findOne({ _id: id, project: projectId });
     } else if (type === 'BILL') {
-      target = await (await import('../models/Bill')).Bill.findById(id);
+      const { Bill } = await import('../models/Bill');
+      target = await Bill.findOne({ _id: id, project: projectId });
     }
 
-    if (!target) return res.status(404).json({ error: 'Item not found' });
+    if (!target) return res.status(404).json({ error: 'Item not found in this project' });
 
     target.pdRemarks = remarks;
     await target.save();
@@ -60,7 +65,8 @@ export const updatePDRemarks = async (req: Request, res: Response) => {
     res.json({ success: true, message: 'Remarks updated by PD' });
 
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
