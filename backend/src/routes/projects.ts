@@ -33,7 +33,8 @@ router.post(
         placedData: parsed
       });
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      console.error(error);
+      res.status(500).json({ error: 'Internal server error' });
     }
   }
 );
@@ -59,7 +60,8 @@ router.get('/my-projects', protect, async (req, res) => {
 
     res.json(projects);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -80,7 +82,8 @@ router.get('/:projectId', protect, requireProjectRole(['DIRECTOR', 'MANAGER', 'E
 
     res.json(project);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -142,7 +145,8 @@ router.post(
 
       res.status(201).json(newDoc);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      console.error(error);
+      res.status(500).json({ error: 'Internal server error' });
     }
   }
 );
@@ -158,7 +162,8 @@ router.post(
       const extracted = await geminiService.extractDPRData(documentName, boqItems);
       res.json(extracted);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      console.error(error);
+      res.status(500).json({ error: 'Internal server error' });
     }
   }
 );
@@ -175,7 +180,8 @@ router.post(
       const insight = await geminiService.generateProjectInsights(project);
       res.json({ insight });
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      console.error(error);
+      res.status(500).json({ error: 'Internal server error' });
     }
   }
 );
@@ -190,7 +196,8 @@ router.post(
       const extracted = await geminiService.extractBillData(documentName);
       res.json(extracted);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      console.error(error);
+      res.status(500).json({ error: 'Internal server error' });
     }
   }
 );
