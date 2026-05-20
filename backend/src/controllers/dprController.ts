@@ -23,6 +23,7 @@ export const createDPR = async (req: Request, res: Response) => {
     await newDPR.save();
 
     // 2. Auto-update BOQ executed quantity (if linked)
+    // ✅ Security: Ensure BOQ item belongs to the project (BOLA/IDOR mitigation)
     if (dprData.linkedBoqId && dprData.workDoneQty) {
       const boqItem = await BOQItem.findOne({ _id: dprData.linkedBoqId, project: projectId });
       if (boqItem) {
@@ -34,6 +35,7 @@ export const createDPR = async (req: Request, res: Response) => {
     // 3. Auto-deduct material stock
     if (dprData.materialsUsed && dprData.materialsUsed.length > 0) {
       for (const usage of dprData.materialsUsed) {
+        // ✅ Security: Ensure material belongs to the project (BOLA/IDOR mitigation)
         const material = await Material.findOne({ _id: usage.materialId, project: projectId });
         if (material) {
           material.totalConsumed = (material.totalConsumed || 0) + Number(usage.qty);
@@ -45,6 +47,7 @@ export const createDPR = async (req: Request, res: Response) => {
 
     // 4. Auto-create subcontractor liability (if linked)
     if (dprData.subContractorId && dprData.workDoneQty && dprData.linkedBoqId) {
+      // ✅ Security: Ensure subcontractor belongs to the project (BOLA/IDOR mitigation)
       const subCon = await SubContractor.findOne({ _id: dprData.subContractorId, project: projectId });
       if (subCon) {
         const rateObj = subCon.agreedRates.find(r => r.boqId === dprData.linkedBoqId);
