@@ -1,0 +1,4 @@
+## 2025-03-24 - Broken Object Level Authorization (BOLA) and Information Leakage Remediation
+**Vulnerability:** Multiple endpoints were using `findById` without scoping the query to the `projectId`, allowing a user authorized for one project to potentially access or modify resources (Materials, BOQItems, Bills, etc.) belonging to another project if they knew the resource ID. Additionally, 500 error responses were returning `error.message`, which could leak sensitive internal implementation details.
+**Learning:** Standardizing on project-scoped queries like `findOne({ _id: id, project: projectId })` is essential for multi-tenant or multi-project applications to prevent IDOR/BOLA.
+**Prevention:** Always scope sub-resource lookups by the parent project ID. Use generic error messages for 500 responses in production while logging the actual error for debugging.
