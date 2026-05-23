@@ -31,16 +31,22 @@ export const createDPR = async (req: Request, res: Response) => {
       }
     }
 
-    // 3. Auto-deduct material stock
+    // 3. Auto-deduct material stock (Optimized: single bulkWrite with aggregation pipeline)
     if (dprData.materialsUsed && dprData.materialsUsed.length > 0) {
-      for (const usage of dprData.materialsUsed) {
-        const material = await Material.findById(usage.materialId);
-        if (material) {
-          material.totalConsumed = (material.totalConsumed || 0) + Number(usage.qty);
-          material.currentStock = Math.max(0, (material.currentStock || 0) - Number(usage.qty));
-          await material.save();
+      const materialOps = dprData.materialsUsed.map((usage: any) => ({
+        updateOne: {
+          filter: { _id: usage.materialId },
+          update: [
+            {
+              $set: {
+                totalConsumed: { $add: [{ $ifNull: ['$totalConsumed', 0] }, Number(usage.qty)] },
+                currentStock: { $max: [0, { $subtract: [{ $ifNull: ['$currentStock', 0] }, Number(usage.qty)] }] }
+              }
+            }
+          ]
         }
-      }
+      }));
+      await Material.bulkWrite(materialOps);
     }
 
     // 4. Auto-create subcontractor liability (if linked)
