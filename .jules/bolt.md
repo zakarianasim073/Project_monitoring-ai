@@ -1,3 +1,7 @@
 ## 2025-05-15 - Optimizing Bill Creation and BOQ Distribution
 **Learning:** The `Project` model in this application acts as a root aggregate with many large sub-document arrays. Using `findById` triggers full hydration of these arrays, which is inefficient for simple existence checks. Additionally, updating BOQ items in a loop with `.save()` creates an N+1 query problem, significantly slowing down bill processing as the number of BOQ items grows.
 **Action:** Use `Model.exists()` for presence validation and `updateMany` with atomic operators like `$inc` for bulk updates to eliminate N+1 overhead and minimize database roundtrips.
+
+## 2026-05-23 - Atomic Batching and Hydration-Free Validation in DPR Controller
+**Learning:** Hydrating the `Project` document during DPR creation is extremely expensive because it contains multiple large sub-document arrays (DPRs, liabilities, materials, etc.). Furthermore, updating material stocks in a loop with individual `.save()` calls leads to multiple database roundtrips and potential race conditions in stock clamping logic.
+**Action:** Replaced `Project.findById` with `Project.exists` and consolidated all project-related updates into a single `updateOne` call with `$push`. Implemented `Material.bulkWrite` with an aggregation pipeline to perform atomic stock decrements and zero-clamping in a single database operation, significantly reducing roundtrips and ensuring data consistency.
