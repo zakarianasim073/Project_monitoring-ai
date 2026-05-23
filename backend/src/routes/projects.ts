@@ -33,7 +33,8 @@ router.post(
         placedData: parsed
       });
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      console.error(error);
+      res.status(500).json({ error: 'Internal server error' });
     }
   }
 );
@@ -59,7 +60,8 @@ router.get('/my-projects', protect, async (req, res) => {
 
     res.json(projects);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -80,7 +82,8 @@ router.get('/:projectId', protect, requireProjectRole(['DIRECTOR', 'MANAGER', 'E
 
     res.json(project);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -126,23 +129,31 @@ router.post(
       const { ProjectDocument } = await import('../models/ProjectDocument');
       const { Project } = await import('../models/Project');
 
+      const projectExists = await Project.exists({ _id: req.params.projectId });
+      if (!projectExists) return res.status(404).json({ error: 'Project not found' });
+
       const newDoc = new ProjectDocument({
-        ...req.body,
+        name: req.body.name,
+        type: req.body.type,
+        category: req.body.category,
+        module: req.body.module,
+        size: req.body.size,
+        url: req.body.url,
         project: req.params.projectId,
         uploadDate: new Date().toISOString().split('T')[0]
       });
 
       await newDoc.save();
 
-      const project = await Project.findById(req.params.projectId);
-      if (project) {
-        project.documents.push(newDoc._id);
-        await project.save();
-      }
+      await Project.updateOne(
+        { _id: req.params.projectId },
+        { $push: { documents: newDoc._id } }
+      );
 
       res.status(201).json(newDoc);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      console.error(error);
+      res.status(500).json({ error: 'Internal server error' });
     }
   }
 );
@@ -158,7 +169,8 @@ router.post(
       const extracted = await geminiService.extractDPRData(documentName, boqItems);
       res.json(extracted);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      console.error(error);
+      res.status(500).json({ error: 'Internal server error' });
     }
   }
 );
@@ -166,6 +178,7 @@ router.post(
 router.post(
   '/:projectId/ai/insights', 
   protect, 
+  requireProjectRole(['DIRECTOR', 'MANAGER', 'ENGINEER', 'ACCOUNTANT']),
   async (req, res) => {
     try {
       const { Project } = await import('../models/Project');
@@ -175,7 +188,8 @@ router.post(
       const insight = await geminiService.generateProjectInsights(project);
       res.json({ insight });
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      console.error(error);
+      res.status(500).json({ error: 'Internal server error' });
     }
   }
 );
@@ -190,7 +204,8 @@ router.post(
       const extracted = await geminiService.extractBillData(documentName);
       res.json(extracted);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      console.error(error);
+      res.status(500).json({ error: 'Internal server error' });
     }
   }
 );
