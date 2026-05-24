@@ -9,6 +9,11 @@ const queryClient = new QueryClient();
 function App() {
   const token = localStorage.getItem('token');
 
+  const handleSwitchRole = (role: string) => {
+    localStorage.setItem('currentRole', role);
+    window.location.reload();
+  };
+
   return (
     <QueryClientProvider client={queryClient}>
       <Router>
@@ -19,7 +24,7 @@ function App() {
           {/* Protected Routes */}
           <Route 
             path="/projects" 
-            element={token ? <ProjectList /> : <Navigate to="/login" />} 
+            element={token ? <ProjectList onSwitchRole={handleSwitchRole} /> : <Navigate to="/login" />}
           />
           
           <Route 
