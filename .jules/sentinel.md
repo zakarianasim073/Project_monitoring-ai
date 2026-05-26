@@ -1,0 +1,4 @@
+## 2025-03-21 - Remediate BOLA and Information Leakage Regressions
+**Vulnerability:** Broken Object Level Authorization (BOLA) where sub-resources (Materials, SubContractors, Bills) were accessed via `findById` without project scoping. Also, Information Leakage via `error.message` in 500 responses and missing authorization middleware on AI insights endpoint.
+**Learning:** High-performance patterns and security remediations are prone to regressions during maintenance, often reverting to simpler but less secure `findById` patterns or overly verbose error handling.
+**Prevention:** Always use project-scoped queries like `findOne({ _id: id, project: projectId })` for sub-resources. Standardize on generic 'Internal server error' responses and ensure all project-related routes have the `requireProjectRole` middleware.
