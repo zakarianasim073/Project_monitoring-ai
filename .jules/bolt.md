@@ -4,4 +4,4 @@
 
 ## 2026-05-26 - Optimized Atomic Updates and Parallelism in createDPR
 **Learning:** Sequential database operations and manual "hydrate-modify-save" patterns in complex controllers like createDPR create significant latency and are prone to race conditions. Using Promise.all for parallelism and bulkWrite with aggregation pipelines for atomic side effects (like stock clamping) reduces database roundtrips and improves reliability.
-**Action:** Always prefer atomic operators (, bulkWrite with pipelines) over document hydration for side effects. Explicitly type mixed promises as Promise<any> when using Promise.all to satisfy TypeScript.
+**Action:** Always prefer atomic operators ($inc, bulkWrite with pipelines) over document hydration for side effects. Explicitly type mixed promises as Promise<any> when using Promise.all to satisfy TypeScript.
