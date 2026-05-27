@@ -1,3 +1,7 @@
 ## 2025-05-15 - Optimizing Bill Creation and BOQ Distribution
 **Learning:** The `Project` model in this application acts as a root aggregate with many large sub-document arrays. Using `findById` triggers full hydration of these arrays, which is inefficient for simple existence checks. Additionally, updating BOQ items in a loop with `.save()` creates an N+1 query problem, significantly slowing down bill processing as the number of BOQ items grows.
 **Action:** Use `Model.exists()` for presence validation and `updateMany` with atomic operators like `$inc` for bulk updates to eliminate N+1 overhead and minimize database roundtrips.
+
+## 2025-05-20 - Preventing Performance Regressions in Controllers
+**Learning:** High-performance patterns like `bulkWrite` with aggregation pipelines and `Promise.all` for parallelization are frequently reverted to inefficient sequential patterns during routine maintenance in this codebase.
+**Action:** When modifying controllers, prioritize atomic updates ($inc, $push) and bulk operations over document-based `save()` loops to maintain O(1) database roundtrips regardless of payload size.
