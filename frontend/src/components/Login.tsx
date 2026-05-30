@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Lock, User } from 'lucide-react';
+import { Lock, User, Eye, EyeOff } from 'lucide-react';
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -31,24 +32,28 @@ const Login: React.FC = () => {
     setLoading(false);
   };
 
+  const fillDemo = (demoEmail: string) => {
+    setEmail(demoEmail);
+    setPassword('123456');
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
         <div className="p-10">
           <div className="flex justify-center mb-8">
-            <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center">
-              <span className="text-white text-4xl font-bold">B</span>
-            </div>
+            <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-bold text-4xl">B</div>
           </div>
           <h1 className="text-4xl font-bold text-center text-slate-900 mb-2">BuildTrack AI</h1>
           <p className="text-slate-500 text-center mb-10">Construction Project Management</p>
 
           <form onSubmit={handleLogin} className="space-y-6">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
+              <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-1">Email</label>
               <div className="relative">
                 <User className="w-5 h-5 absolute left-4 top-3.5 text-slate-400" />
                 <input
+                  id="email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -60,17 +65,26 @@ const Login: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
+              <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-1">Password</label>
               <div className="relative">
                 <Lock className="w-5 h-5 absolute left-4 top-3.5 text-slate-400" />
                 <input
-                  type="password"
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3 border border-slate-300 rounded-2xl focus:outline-none focus:border-blue-500"
+                  className="w-full pl-11 pr-12 py-3 border border-slate-300 rounded-2xl focus:outline-none focus:border-blue-500"
                   placeholder="123456"
                   required
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-3.5 text-slate-400 hover:text-slate-600 focus:outline-none"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
               </div>
             </div>
 
@@ -83,10 +97,24 @@ const Login: React.FC = () => {
             </button>
           </form>
 
-          <div className="mt-8 text-center text-xs text-slate-500">
-            Demo Accounts:<br />
-            director@buildtrack.bd / 123456<br />
-            engineer@buildtrack.bd / 123456
+          <div className="mt-8 p-4 bg-slate-50 rounded-2xl">
+            <p className="text-center text-xs font-semibold text-slate-500 mb-3 uppercase tracking-wider">Demo Accounts</p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => fillDemo('director@buildtrack.bd')}
+                className="flex-1 text-xs bg-white border border-slate-200 py-2 rounded-xl hover:bg-blue-50 hover:border-blue-200 transition-all font-medium text-slate-600"
+              >
+                Director
+              </button>
+              <button
+                type="button"
+                onClick={() => fillDemo('engineer@buildtrack.bd')}
+                className="flex-1 text-xs bg-white border border-slate-200 py-2 rounded-xl hover:bg-blue-50 hover:border-blue-200 transition-all font-medium text-slate-600"
+              >
+                Engineer
+              </button>
+            </div>
           </div>
         </div>
       </div>
