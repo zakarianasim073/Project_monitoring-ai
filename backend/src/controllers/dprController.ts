@@ -94,7 +94,8 @@ export const createDPR = async (req: Request, res: Response) => {
     res.status(201).json({
       success: true,
       message: "DPR created with full automation",
-      dpr: newDPR
+      dpr: newDPR,
+      data: newDPR // Maintain backward compatibility
     });
 
   } catch (error: any) {
