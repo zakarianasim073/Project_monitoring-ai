@@ -31,6 +31,7 @@ jobs:
     - name: Build Frontend
       run: |
         cd frontend
-        npm install -g pnpm
+        # Use pnpm 9 to avoid build script approval issues in pnpm 10+
+        npm install -g pnpm@9
         pnpm install
         pnpm run build
