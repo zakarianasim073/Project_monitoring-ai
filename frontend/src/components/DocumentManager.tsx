@@ -2,24 +2,7 @@ import React, { useState } from 'react';
 import { ProjectDocument } from '../types';
 import { FileText, Image, File, Search, UploadCloud, Download, X, Sparkles, Loader2 } from 'lucide-react';
 import { api } from '../services/api';
-
-// Inside DocumentManager component
-<button 
-  onClick={() => setShowSmartUpload(true)}
-  className="flex items-center gap-2 bg-emerald-600 text-white px-5 py-2.5 rounded-2xl text-sm font-medium"
->
-  <Sparkles className="w-4 h-4" /> Smart Import (PDF/Excel/Word)
-</button>
-
-// Add this modal
-{showSmartUpload && (
-  <SmartUploadModal 
-    projectId={projectId!}
-    isOpen={showSmartUpload}
-    onClose={() => setShowSmartUpload(false)}
-    onSuccess={() => window.location.reload()}
-  />
-)}
+import SmartUploadModal from './SmartUploadModal';
 
 interface DocumentManagerProps {
   documents: ProjectDocument[];
@@ -27,6 +10,7 @@ interface DocumentManagerProps {
   filterModule?: string;
   compact?: boolean;
   allowUpload?: boolean;
+  projectId?: string;
 }
 
 const DocumentManager: React.FC<DocumentManagerProps> = ({ 
@@ -34,9 +18,11 @@ const DocumentManager: React.FC<DocumentManagerProps> = ({
   onAddDocument, 
   filterModule,
   compact = false,
-  allowUpload = true 
+  allowUpload = true,
+  projectId
 }) => {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [showSmartUpload, setShowSmartUpload] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
 
@@ -62,18 +48,85 @@ const DocumentManager: React.FC<DocumentManagerProps> = ({
 
   return (
     <div className={`bg-white rounded-3xl border border-slate-200 overflow-hidden ${compact ? '' : 'h-full'}`}>
-      <div className="p-6 border-b flex justify-between">
+      <div className="p-6 border-b flex justify-between items-center">
         <h3 className="font-semibold text-xl">Documents</h3>
-        {allowUpload && (
-          <button onClick={() => setIsUploadModalOpen(true)} className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-2xl text-sm">
-            <UploadCloud className="w-4 h-4" /> Upload
-          </button>
+        <div className="flex gap-3">
+          {allowUpload && (
+            <>
+              <button
+                onClick={() => setShowSmartUpload(true)}
+                className="flex items-center gap-2 bg-emerald-600 text-white px-5 py-2.5 rounded-2xl text-sm font-medium hover:bg-emerald-700 transition-colors"
+              >
+                <Sparkles className="w-4 h-4" /> Smart Import
+              </button>
+              <button
+                onClick={() => setIsUploadModalOpen(true)}
+                className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-2xl text-sm font-medium hover:bg-blue-700 transition-colors"
+              >
+                <UploadCloud className="w-4 h-4" /> Upload
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      <div className="p-6">
+        {documents.length === 0 ? (
+          <div className="text-center py-12 text-slate-500">
+            <FileText className="w-12 h-12 mx-auto mb-4 opacity-20" />
+            <p>No documents found</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="text-slate-400 text-sm border-b">
+                  <th className="pb-4 font-medium">Name</th>
+                  <th className="pb-4 font-medium text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {documents.map((doc) => (
+                  <tr key={doc.id} className="group hover:bg-slate-50">
+                    <td className="py-4 text-slate-700">{doc.name}</td>
+                    <td className="py-4 text-right">
+                      <button className="p-2 hover:bg-slate-200 rounded-lg text-slate-400">
+                        <Download className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
-      {/* Your original table with AI Deep Scan buttons */}
+      {isUploadModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-3xl w-full max-w-md p-8">
+            <h2 className="text-2xl font-bold mb-6">Upload Document</h2>
+            <input type="file" onChange={e => setSelectedFile(e.target.files?.[0] || null)} className="mb-6" />
+            <button
+              onClick={handleUpload}
+              disabled={!selectedFile || uploading}
+              className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold disabled:opacity-50"
+            >
+              {uploading ? 'Uploading...' : 'Upload Now'}
+            </button>
+            <button onClick={() => setIsUploadModalOpen(false)} className="w-full mt-4 text-slate-500 font-medium">Cancel</button>
+          </div>
+        </div>
+      )}
 
-      {/* Upload Modal - keep your beautiful modal */}
+      {showSmartUpload && (
+        <SmartUploadModal
+          projectId={projectId!}
+          isOpen={showSmartUpload}
+          onClose={() => setShowSmartUpload(false)}
+          onSuccess={() => window.location.reload()}
+        />
+      )}
     </div>
   );
 };
