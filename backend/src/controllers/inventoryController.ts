@@ -7,33 +7,49 @@ export const receiveMaterial = async (req: Request, res: Response) => {
     const { projectId } = req.params;
     const { materialId, qty, rate } = req.body;
 
-    const project = await Project.findById(projectId);
-    if (!project) return res.status(404).json({ error: 'Project not found' });
+    // BOLT OPTIMIZATION: Parallelize project validation and material update.
+    // Use an aggregation pipeline in findOneAndUpdate to atomically update stock and
+    // average rate in a single roundtrip, eliminating N+1 and hydration overhead.
+    const [projectExists, updatedMaterial] = await Promise.all([
+      Project.exists({ _id: projectId }),
+      Material.findOneAndUpdate(
+        { _id: materialId, project: projectId },
+        [
+          {
+            $set: {
+              totalReceived: { $add: [{ $ifNull: ["$totalReceived", 0] }, Number(qty)] },
+              currentStock: { $add: [{ $ifNull: ["$currentStock", 0] }, Number(qty)] },
+              averageRate: rate ? {
+                $divide: [
+                  {
+                    $add: [
+                      { $multiply: [{ $ifNull: ["$averageRate", 0] }, { $ifNull: ["$totalReceived", 0] }] },
+                      { $multiply: [Number(rate), Number(qty)] }
+                    ]
+                  },
+                  { $add: [{ $ifNull: ["$totalReceived", 0] }, Number(qty)] }
+                ]
+              } : "$averageRate"
+            }
+          }
+        ],
+        { new: true }
+      )
+    ]);
 
-    const material = await Material.findById(materialId);
-    if (!material) return res.status(404).json({ error: 'Material not found' });
-
-    // Update stock
-    material.totalReceived += Number(qty);
-    material.currentStock += Number(qty);
-    
-    if (rate) {
-      // Update average rate (weighted average)
-      const oldTotalValue = material.averageRate * material.totalReceived;
-      const newTotalValue = oldTotalValue + (Number(rate) * Number(qty));
-      material.averageRate = newTotalValue / material.totalReceived;
-    }
-
-    await material.save();
+    if (!projectExists) return res.status(404).json({ error: 'Project not found' });
+    if (!updatedMaterial) return res.status(404).json({ error: 'Material not found' });
 
     res.json({
       success: true,
-      message: `Received ${qty} ${material.unit} of ${material.name}`,
-      material
+      message: `Received ${qty} ${updatedMaterial.unit} of ${updatedMaterial.name}`,
+      material: updatedMaterial
     });
 
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    // SENTINEL HARDENING: Log error and return generic message
+    console.error('Inventory Error:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -45,11 +61,13 @@ export const updatePDRemarks = async (req: Request, res: Response) => {
     let target: any = null;
 
     if (type === 'MATERIAL') {
-      target = await Material.findById(id);
+      target = await Material.findOne({ _id: id, project: projectId });
     } else if (type === 'SUBCONTRACTOR') {
-      target = await (await import('../models/SubContractor')).SubContractor.findById(id);
+      const { SubContractor } = await import('../models/SubContractor');
+      target = await SubContractor.findOne({ _id: id, project: projectId });
     } else if (type === 'BILL') {
-      target = await (await import('../models/Bill')).Bill.findById(id);
+      const { Bill } = await import('../models/Bill');
+      target = await Bill.findOne({ _id: id, project: projectId });
     }
 
     if (!target) return res.status(404).json({ error: 'Item not found' });
@@ -60,7 +78,9 @@ export const updatePDRemarks = async (req: Request, res: Response) => {
     res.json({ success: true, message: 'Remarks updated by PD' });
 
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    // SENTINEL HARDENING: Log error and return generic message
+    console.error('PD Remarks Error:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
