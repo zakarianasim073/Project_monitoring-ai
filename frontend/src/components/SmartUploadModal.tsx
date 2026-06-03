@@ -29,7 +29,7 @@ const SmartUploadModal = ({ projectId, isOpen, onClose, onSuccess }: any) => {
 
     if (data.success) {
       setTimeout(() => {
-        onSuccess();
+        onSuccess(data);
         onClose();
       }, 1500);
     }

@@ -10,7 +10,7 @@ interface DocumentManagerProps {
   filterModule?: string;
   compact?: boolean;
   allowUpload?: boolean;
-  projectId?: string;
+  projectId: string;
 }
 
 const DocumentManager: React.FC<DocumentManagerProps> = ({ 
@@ -90,7 +90,10 @@ const DocumentManager: React.FC<DocumentManagerProps> = ({
                   <tr key={doc.id} className="group hover:bg-slate-50">
                     <td className="py-4 text-slate-700">{doc.name}</td>
                     <td className="py-4 text-right">
-                      <button className="p-2 hover:bg-slate-200 rounded-lg text-slate-400">
+                      <button
+                        className="p-2 hover:bg-slate-200 rounded-lg text-slate-400 transition-colors"
+                        aria-label={`Download ${doc.name}`}
+                      >
                         <Download className="w-4 h-4" />
                       </button>
                     </td>
@@ -106,7 +109,12 @@ const DocumentManager: React.FC<DocumentManagerProps> = ({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="bg-white rounded-3xl w-full max-w-md p-8">
             <h2 className="text-2xl font-bold mb-6">Upload Document</h2>
-            <input type="file" onChange={e => setSelectedFile(e.target.files?.[0] || null)} className="mb-6" />
+            <input
+              type="file"
+              onChange={e => setSelectedFile(e.target.files?.[0] || null)}
+              className="mb-6 block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+              aria-label="Select file to upload"
+            />
             <button
               onClick={handleUpload}
               disabled={!selectedFile || uploading}
@@ -121,10 +129,13 @@ const DocumentManager: React.FC<DocumentManagerProps> = ({
 
       {showSmartUpload && (
         <SmartUploadModal
-          projectId={projectId!}
+          projectId={projectId}
           isOpen={showSmartUpload}
           onClose={() => setShowSmartUpload(false)}
-          onSuccess={() => window.location.reload()}
+          onSuccess={(data: any) => {
+            // Ideally we'd update state here, for now use reload but onSuccess can be better
+            window.location.reload();
+          }}
         />
       )}
     </div>
