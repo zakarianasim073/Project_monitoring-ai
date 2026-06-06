@@ -1,0 +1,4 @@
+## 2026-06-06 - BOLA Prevention and Error Hardening
+**Vulnerability:** Broken Object Level Authorization (BOLA) and Information Leakage in `inventoryController.ts`.
+**Learning:** Controllers that manage sub-resources (like Materials or Bills) based on a URL `projectId` must explicitly scope all database lookups to that `projectId` (using `findOne({ _id: id, project: projectId })`) rather than using global `findById(id)`. This prevents users from manipulating resources in projects they don't have access to by simply swapping IDs in the request body. Additionally, returning raw `error.message` in 500 responses leaks internal server details.
+**Prevention:** Always use scoped lookups for project-related resources and standardize on generic `{ error: 'Internal server error' }` responses for all catch blocks, logging the detailed error only to the server console.
