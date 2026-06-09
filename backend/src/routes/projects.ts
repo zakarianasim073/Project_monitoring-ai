@@ -166,6 +166,8 @@ router.post(
 router.post(
   '/:projectId/ai/insights', 
   protect, 
+  // SECURITY: Ensure only project members can access AI-generated insights to prevent unauthorized data exposure
+  requireProjectRole(['DIRECTOR', 'MANAGER', 'ENGINEER', 'ACCOUNTANT']),
   async (req, res) => {
     try {
       const { Project } = await import('../models/Project');
