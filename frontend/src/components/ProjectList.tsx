@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Building2, PlusCircle, Lock, Flag, ArrowRight, UserCircle } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Building2, PlusCircle, Lock, Flag, ArrowRight, UserCircle, ChevronDown, Check } from 'lucide-react';
 import { ProjectState, UserRole, Priority } from '../types';
 import { api } from '../services/api';
 import { useNavigate } from 'react-router-dom';
@@ -11,9 +11,35 @@ interface ProjectListProps {
 const ProjectList: React.FC<ProjectListProps> = ({ onSwitchRole }) => {
   const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isRoleMenuOpen, setIsRoleMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
   const currentUserRole = localStorage.getItem('currentRole') || 'ENGINEER';
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsRoleMenuOpen(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsRoleMenuOpen(false);
+      }
+    };
+
+    if (isRoleMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleEscape);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [isRoleMenuOpen]);
 
   useEffect(() => {
     const loadProjects = async () => {
@@ -52,19 +78,39 @@ const ProjectList: React.FC<ProjectListProps> = ({ onSwitchRole }) => {
           <p className="text-slate-500 mt-2">Select a project to continue</p>
         </div>
         <div className="flex items-center gap-4">
-          <div className="relative group">
-            <button className="flex items-center gap-3 px-5 py-3 bg-white border border-slate-200 rounded-2xl hover:border-blue-400">
-              <UserCircle className="w-6 h-6" />
+          <div className="relative" ref={menuRef}>
+            <button
+              onClick={() => setIsRoleMenuOpen(!isRoleMenuOpen)}
+              aria-haspopup="true"
+              aria-expanded={isRoleMenuOpen}
+              aria-label="Switch user role"
+              className="flex items-center gap-3 px-5 py-3 bg-white border border-slate-200 rounded-2xl hover:border-blue-400 transition-colors"
+            >
+              <UserCircle className="w-6 h-6 text-slate-500" />
               <span className="font-medium">{currentUserRole}</span>
+              <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isRoleMenuOpen ? 'rotate-180' : ''}`} />
             </button>
-            {/* Role switcher dropdown */}
-            <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded-2xl shadow-xl hidden group-hover:block z-50">
-              {(['DIRECTOR', 'MANAGER', 'ENGINEER', 'ACCOUNTANT'] as UserRole[]).map(role => (
-                <button key={role} onClick={() => onSwitchRole(role)} className="w-full text-left px-6 py-3 hover:bg-slate-50">
-                  {role}
-                </button>
-              ))}
-            </div>
+
+            {isRoleMenuOpen && (
+              <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 overflow-hidden">
+                <div className="px-6 py-3 border-b border-slate-50">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Select Role</span>
+                </div>
+                {(['DIRECTOR', 'MANAGER', 'ENGINEER', 'ACCOUNTANT'] as UserRole[]).map(role => (
+                  <button
+                    key={role}
+                    onClick={() => {
+                      onSwitchRole?.(role);
+                      setIsRoleMenuOpen(false);
+                    }}
+                    className="w-full flex items-center justify-between px-6 py-3 hover:bg-slate-50 transition-colors text-slate-700"
+                  >
+                    <span className={currentUserRole === role ? 'font-bold text-blue-600' : ''}>{role}</span>
+                    {currentUserRole === role && <Check className="w-4 h-4 text-blue-600" />}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
