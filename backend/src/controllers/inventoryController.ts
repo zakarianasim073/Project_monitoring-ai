@@ -7,33 +7,54 @@ export const receiveMaterial = async (req: Request, res: Response) => {
     const { projectId } = req.params;
     const { materialId, qty, rate } = req.body;
 
-    const project = await Project.findById(projectId);
-    if (!project) return res.status(404).json({ error: 'Project not found' });
+    // BOLT: Use .exists() to avoid full hydration of large project arrays
+    const projectExists = await Project.exists({ _id: projectId });
+    if (!projectExists) return res.status(404).json({ error: 'Project not found' });
 
-    const material = await Material.findById(materialId);
-    if (!material) return res.status(404).json({ error: 'Material not found' });
+    // BOLT: Atomic update using aggregation pipeline to prevent race conditions
+    // and eliminate the fetch-calculate-save cycle (N+1 avoidance).
+    // Also fixes a logic bug where oldTotalValue calculation was using post-increment totalReceived.
+    const updatedMaterial = await Material.findOneAndUpdate(
+      { _id: materialId, project: projectId }, // SECURITY: Scoped to projectId for BOLA protection
+      [
+        {
+          $set: {
+            averageRate: {
+              $cond: {
+                if: { $gt: [Number(rate || 0), 0] },
+                then: {
+                  $divide: [
+                    {
+                      $add: [
+                        { $multiply: ["$averageRate", "$totalReceived"] },
+                        { $multiply: [Number(rate || 0), Number(qty)] }
+                      ]
+                    },
+                    { $add: ["$totalReceived", Number(qty)] }
+                  ]
+                },
+                else: "$averageRate"
+              }
+            },
+            totalReceived: { $add: ["$totalReceived", Number(qty)] },
+            currentStock: { $add: ["$currentStock", Number(qty)] }
+          }
+        }
+      ],
+      { new: true }
+    );
 
-    // Update stock
-    material.totalReceived += Number(qty);
-    material.currentStock += Number(qty);
-    
-    if (rate) {
-      // Update average rate (weighted average)
-      const oldTotalValue = material.averageRate * material.totalReceived;
-      const newTotalValue = oldTotalValue + (Number(rate) * Number(qty));
-      material.averageRate = newTotalValue / material.totalReceived;
-    }
-
-    await material.save();
+    if (!updatedMaterial) return res.status(404).json({ error: 'Material not found' });
 
     res.json({
       success: true,
-      message: `Received ${qty} ${material.unit} of ${material.name}`,
-      material
+      message: `Received ${qty} ${updatedMaterial.unit} of ${updatedMaterial.name}`,
+      material: updatedMaterial
     });
 
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    // SECURITY: Use generic error message to prevent information leakage
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
