@@ -12,6 +12,7 @@ export const createDPR = async (req: Request, res: Response) => {
     const { projectId } = req.params;
     const dprData = req.body;
 
+    // SECURITY: Validate project exists
     const project = await Project.findById(projectId);
     if (!project) return res.status(404).json({ error: 'Project not found' });
 
@@ -23,8 +24,9 @@ export const createDPR = async (req: Request, res: Response) => {
     await newDPR.save();
 
     // 2. Auto-update BOQ executed quantity (if linked)
+    // SECURITY: Scope BOQItem lookup to projectId to prevent BOLA
     if (dprData.linkedBoqId && dprData.workDoneQty) {
-      const boqItem = await BOQItem.findById(dprData.linkedBoqId);
+      const boqItem = await BOQItem.findOne({ _id: dprData.linkedBoqId, project: projectId });
       if (boqItem) {
         boqItem.executedQty += Number(dprData.workDoneQty);
         await boqItem.save();
@@ -32,9 +34,10 @@ export const createDPR = async (req: Request, res: Response) => {
     }
 
     // 3. Auto-deduct material stock
+    // SECURITY: Scope Material lookup to projectId to prevent BOLA
     if (dprData.materialsUsed && dprData.materialsUsed.length > 0) {
       for (const usage of dprData.materialsUsed) {
-        const material = await Material.findById(usage.materialId);
+        const material = await Material.findOne({ _id: usage.materialId, project: projectId });
         if (material) {
           material.totalConsumed = (material.totalConsumed || 0) + Number(usage.qty);
           material.currentStock = Math.max(0, (material.currentStock || 0) - Number(usage.qty));
@@ -44,8 +47,9 @@ export const createDPR = async (req: Request, res: Response) => {
     }
 
     // 4. Auto-create subcontractor liability (if linked)
+    // SECURITY: Scope SubContractor lookup to projectId to prevent BOLA
     if (dprData.subContractorId && dprData.workDoneQty && dprData.linkedBoqId) {
-      const subCon = await SubContractor.findById(dprData.subContractorId);
+      const subCon = await SubContractor.findOne({ _id: dprData.subContractorId, project: projectId });
       if (subCon) {
         const rateObj = subCon.agreedRates.find(r => r.boqId === dprData.linkedBoqId);
         const rate = rateObj ? (rateObj.rate || 0) : 0;
@@ -77,7 +81,7 @@ export const createDPR = async (req: Request, res: Response) => {
 
   } catch (error: any) {
     console.error(error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
