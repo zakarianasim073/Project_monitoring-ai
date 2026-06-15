@@ -28,6 +28,7 @@ const LiabilityTracker: React.FC = () => {
       </div>
 
       <DocumentManager 
+        projectId={projectId}
         documents={data?.documents || []} 
         onAddDocument={(doc) => api.addDocument(projectId, doc)}
         filterModule="LIABILITY" 
