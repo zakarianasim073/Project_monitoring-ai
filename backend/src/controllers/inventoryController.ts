@@ -7,33 +7,50 @@ export const receiveMaterial = async (req: Request, res: Response) => {
     const { projectId } = req.params;
     const { materialId, qty, rate } = req.body;
 
-    const project = await Project.findById(projectId);
-    if (!project) return res.status(404).json({ error: 'Project not found' });
+    // Use .exists() for faster validation without hydrating large project arrays
+    const projectExists = await Project.exists({ _id: projectId });
+    if (!projectExists) return res.status(404).json({ error: 'Project not found' });
 
-    const material = await Material.findById(materialId);
-    if (!material) return res.status(404).json({ error: 'Material not found' });
+    const q = Number(qty);
+    const r = Number(rate) || 0;
 
-    // Update stock
-    material.totalReceived += Number(qty);
-    material.currentStock += Number(qty);
-    
-    if (rate) {
-      // Update average rate (weighted average)
-      const oldTotalValue = material.averageRate * material.totalReceived;
-      const newTotalValue = oldTotalValue + (Number(rate) * Number(qty));
-      material.averageRate = newTotalValue / material.totalReceived;
-    }
+    // Use atomic aggregation pipeline to update stock and weighted average in one roundtrip
+    // This also fixes the BOLA vulnerability by scoping to projectId
+    const updatedMaterial = await Material.findOneAndUpdate(
+      { _id: materialId, project: projectId },
+      [
+        {
+          $set: {
+            averageRate: {
+              $cond: {
+                if: { $gt: [r, 0] },
+                then: {
+                  $divide: [
+                    { $add: [{ $multiply: ["$averageRate", "$totalReceived"] }, (r * q)] },
+                    { $add: ["$totalReceived", q] }
+                  ]
+                },
+                else: "$averageRate"
+              }
+            },
+            totalReceived: { $add: ["$totalReceived", q] },
+            currentStock: { $add: ["$currentStock", q] }
+          }
+        }
+      ],
+      { new: true }
+    );
 
-    await material.save();
+    if (!updatedMaterial) return res.status(404).json({ error: 'Material not found' });
 
     res.json({
       success: true,
-      message: `Received ${qty} ${material.unit} of ${material.name}`,
-      material
+      message: `Received ${qty} ${updatedMaterial.unit} of ${updatedMaterial.name}`,
+      material: updatedMaterial
     });
 
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -42,25 +59,28 @@ export const updatePDRemarks = async (req: Request, res: Response) => {
     const { projectId } = req.params;
     const { type, id, remarks } = req.body; // type: 'MATERIAL' | 'SUBCONTRACTOR' | 'BILL'
 
-    let target: any = null;
+    let result;
 
+    // Optimize by using updateOne instead of findById + save
+    // Enforce BOLA by scoping to projectId
     if (type === 'MATERIAL') {
-      target = await Material.findById(id);
+      result = await Material.updateOne({ _id: id, project: projectId }, { pdRemarks: remarks });
     } else if (type === 'SUBCONTRACTOR') {
-      target = await (await import('../models/SubContractor')).SubContractor.findById(id);
+      const { SubContractor } = await import('../models/SubContractor');
+      result = await SubContractor.updateOne({ _id: id, project: projectId }, { pdRemarks: remarks });
     } else if (type === 'BILL') {
-      target = await (await import('../models/Bill')).Bill.findById(id);
+      const { Bill } = await import('../models/Bill');
+      result = await Bill.updateOne({ _id: id, project: projectId }, { pdRemarks: remarks });
+    } else {
+      return res.status(400).json({ error: 'Invalid type' });
     }
 
-    if (!target) return res.status(404).json({ error: 'Item not found' });
-
-    target.pdRemarks = remarks;
-    await target.save();
+    if (result.matchedCount === 0) return res.status(404).json({ error: 'Item not found' });
 
     res.json({ success: true, message: 'Remarks updated by PD' });
 
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
