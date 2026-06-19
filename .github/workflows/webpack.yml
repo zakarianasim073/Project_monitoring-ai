@@ -31,6 +31,7 @@ jobs:
     - name: Build Frontend
       run: |
         cd frontend
-        npm install -g pnpm
+        # Pin pnpm to v9 to avoid ERR_PNPM_IGNORED_BUILDS in v10+ during CI
+        npm install -g pnpm@9
         pnpm install
         pnpm run build
