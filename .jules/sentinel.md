@@ -1,0 +1,4 @@
+## 2026-06-21 - Recurring BOLA and Authorization Regressions
+**Vulnerability:** Identified persistent regressions where BOLA protection (scoping lookups to `projectId`) was removed from `Material`, `BOQItem`, `SubContractor`, and `Bill` lookups in `inventoryController.ts` and `dprController.ts`. Additionally, the `requireProjectRole` middleware was missing from the `/:projectId/ai/insights` route in `projects.ts`, and internal error details were being leaked in catch blocks.
+**Learning:** Security controls are frequently reverted during refactors if they are not part of the core "functional" logic seen by developers. Simple `findById` is often preferred for brevity over secure `findOne` scoping.
+**Prevention:** Always enforce BOLA by scoping sub-resource lookups with `{ _id: id, project: projectId }`. Use generic 'Internal server error' messages in catch blocks to prevent information leakage. Ensure all project-specific routes have `requireProjectRole` middleware.
