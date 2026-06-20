@@ -44,7 +44,9 @@ export const createBill = async (req: Request, res: Response) => {
     });
 
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    // Generic error to prevent info disclosure - Sentinel requirement
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
