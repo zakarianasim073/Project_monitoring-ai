@@ -1,0 +1,4 @@
+## 2024-08-21 - [HIGH] BOLA in resource lookups
+**Vulnerability:** Broken Object Level Authorization (BOLA) in `inventoryController.ts`. Resources like `Material`, `SubContractor`, and `Bill` were being updated or retrieved using only their unique `_id` without verifying they belong to the `projectId` specified in the request URL.
+**Learning:** Developers frequently rely on `findById` for convenience, assuming the ID itself is sufficient security. However, this allows any authenticated user to potentially modify resources in projects they shouldn't have access to if they can guess or obtain the resource ID.
+**Prevention:** Always scope sub-resource database operations with the parent project ID. Use `findOne({ _id: id, project: projectId })`, `updateOne({ _id: id, project: projectId }, ...)`, or `findOneAndUpdate({ _id: id, project: projectId }, ...)` to enforce ownership context at the database level.
