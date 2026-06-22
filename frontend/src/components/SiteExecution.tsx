@@ -8,6 +8,7 @@ import { MapPin, Users, Calendar, PlusCircle, X, ClipboardCheck, Lock, Sparkles,
 const SiteExecution: React.FC = () => {
   const { currentRole, projectId } = useOutletContext<{ currentRole: UserRole; projectId: string }>();
   const [data, setData] = useState<ProjectState | null>(null); // In real app use TanStack Query
+  const [isDprModalOpen, setIsDprModalOpen] = useState(false);
 
   const canAddDPR = currentRole === 'ENGINEER' || currentRole === 'DIRECTOR';
   const canManageStore = currentRole === 'ENGINEER' || currentRole === 'MANAGER' || currentRole === 'DIRECTOR';

@@ -4,6 +4,7 @@ import { ProjectState, UserRole } from '../types';
 import { AlertTriangle, Clock, Lock } from 'lucide-react';
 import { api } from '../services/api';
 import DocumentManager from './DocumentManager';
+import { useState } from 'react';
 
 const LiabilityTracker: React.FC = () => {
   const { currentRole, projectId } = useOutletContext<{ currentRole: UserRole; projectId: string }>();
@@ -28,6 +29,7 @@ const LiabilityTracker: React.FC = () => {
       </div>
 
       <DocumentManager 
+        projectId={projectId}
         documents={data?.documents || []} 
         onAddDocument={(doc) => api.addDocument(projectId, doc)}
         filterModule="LIABILITY" 
