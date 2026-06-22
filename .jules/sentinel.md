@@ -1,0 +1,4 @@
+## 2026-06-23 - Broken Object Level Authorization (BOLA) and Information Disclosure
+**Vulnerability:** Multiple controllers were performing database lookups using only `_id` (e.g., `Material.findById(id)`), allowing users to access or modify resources belonging to other projects if they knew the ID. Additionally, catch blocks were leaking detailed error messages and stack traces.
+**Learning:** Resource lookups in multi-tenant or project-based systems must always be scoped by the project identifier in addition to the resource ID. Generic error messages should be returned to clients to prevent information leakage.
+**Prevention:** Always use `findOne({ _id: id, project: projectId })` instead of `findById(id)` when the resource belongs to a project. Use centralized error handling or a standard pattern for returning generic error responses.
