@@ -1,10 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { ProjectState, UserRole } from '../types';
 import { AlertTriangle, Clock, Lock } from 'lucide-react';
 import { api } from '../services/api';
 import DocumentManager from './DocumentManager';
-import { useState } from 'react';
 
 const LiabilityTracker: React.FC = () => {
   const { currentRole, projectId } = useOutletContext<{ currentRole: UserRole; projectId: string }>();

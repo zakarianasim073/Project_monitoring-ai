@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ProjectDocument } from '../types';
 import { FileText, Image, File, Search, UploadCloud, Download, X, Sparkles, Loader2 } from 'lucide-react';
 import { api } from '../services/api';
@@ -49,6 +49,22 @@ const DocumentManager: React.FC<DocumentManagerProps> = ({
     setIsUploadModalOpen(false);
     setSelectedFile(null);
   };
+
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsUploadModalOpen(false);
+      }
+    };
+    if (isUploadModalOpen) {
+      document.addEventListener('keydown', handleEscape);
+      document.body.style.overflow = 'hidden';
+    }
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+      document.body.style.overflow = 'unset';
+    };
+  }, [isUploadModalOpen]);
 
   return (
     <div className={`bg-white rounded-3xl border border-slate-200 overflow-hidden ${compact ? '' : 'h-full'}`}>
@@ -122,12 +138,22 @@ const DocumentManager: React.FC<DocumentManagerProps> = ({
       )}
 
       {isUploadModalOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setIsUploadModalOpen(false)}>
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+          onClick={() => setIsUploadModalOpen(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="upload-modal-title"
+        >
           <div className="bg-white rounded-3xl w-full max-w-md p-8 shadow-2xl relative" onClick={e => e.stopPropagation()}>
-            <button onClick={() => setIsUploadModalOpen(false)} className="absolute right-6 top-6 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors">
+            <button
+              onClick={() => setIsUploadModalOpen(false)}
+              className="absolute right-6 top-6 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
+              aria-label="Close modal"
+            >
               <X className="w-5 h-5" />
             </button>
-            <h3 className="text-2xl font-bold mb-6">Upload Document</h3>
+            <h3 id="upload-modal-title" className="text-2xl font-bold mb-6 text-slate-800">Upload Document</h3>
             <div className="border-2 border-dashed border-slate-200 rounded-2xl p-10 text-center">
               <input type="file" onChange={e => setSelectedFile(e.target.files?.[0] || null)} className="hidden" id="file-upload" />
               <label htmlFor="file-upload" className="cursor-pointer block">
