@@ -12,40 +12,57 @@ export const createDPR = async (req: Request, res: Response) => {
     const { projectId } = req.params;
     const dprData = req.body;
 
-    const project = await Project.findById(projectId);
-    if (!project) return res.status(404).json({ error: 'Project not found' });
+    // OPTIMIZATION: Use .exists() for faster validation without hydrating large project arrays
+    const projectExists = await Project.exists({ _id: projectId });
+    if (!projectExists) return res.status(404).json({ error: 'Project not found' });
 
-    // 1. Create DPR
+    // 1. Instantiate DPR (ID is generated on instantiation)
     const newDPR = new DPR({
       ...dprData,
       project: projectId,
     });
-    await newDPR.save();
+
+    const promises: Promise<any>[] = [newDPR.save()];
 
     // 2. Auto-update BOQ executed quantity (if linked)
+    // OPTIMIZATION: Use atomic $inc and scope to projectId for BOLA
     if (dprData.linkedBoqId && dprData.workDoneQty) {
-      const boqItem = await BOQItem.findById(dprData.linkedBoqId);
-      if (boqItem) {
-        boqItem.executedQty += Number(dprData.workDoneQty);
-        await boqItem.save();
-      }
+      promises.push(BOQItem.updateOne(
+        { _id: dprData.linkedBoqId, project: projectId },
+        { $inc: { executedQty: Number(dprData.workDoneQty) } }
+      ));
     }
 
     // 3. Auto-deduct material stock
+    // OPTIMIZATION: Use bulkWrite with aggregation pipeline for atomic updates and clamping
     if (dprData.materialsUsed && dprData.materialsUsed.length > 0) {
-      for (const usage of dprData.materialsUsed) {
-        const material = await Material.findById(usage.materialId);
-        if (material) {
-          material.totalConsumed = (material.totalConsumed || 0) + Number(usage.qty);
-          material.currentStock = Math.max(0, (material.currentStock || 0) - Number(usage.qty));
-          await material.save();
+      const materialOps = dprData.materialsUsed.map((usage: any) => ({
+        updateOne: {
+          filter: { _id: usage.materialId, project: projectId },
+          update: [
+            {
+              $set: {
+                totalConsumed: { $add: [{ $ifNull: ['$totalConsumed', 0] }, Number(usage.qty)] },
+                currentStock: {
+                  $max: [0, { $subtract: [{ $ifNull: ['$currentStock', 0] }, Number(usage.qty)] }]
+                }
+              }
+            }
+          ]
         }
-      }
+      }));
+      promises.push(Material.bulkWrite(materialOps));
     }
 
     // 4. Auto-create subcontractor liability (if linked)
+    // OPTIMIZATION: Fetch only necessary fields and scope to projectId
+    let newLiabilityId: any = null;
     if (dprData.subContractorId && dprData.workDoneQty && dprData.linkedBoqId) {
-      const subCon = await SubContractor.findById(dprData.subContractorId);
+      const subCon = await SubContractor.findOne(
+        { _id: dprData.subContractorId, project: projectId },
+        { agreedRates: 1 }
+      );
+
       if (subCon) {
         const rateObj = subCon.agreedRates.find(r => r.boqId === dprData.linkedBoqId);
         const rate = rateObj ? (rateObj.rate || 0) : 0;
@@ -58,16 +75,22 @@ export const createDPR = async (req: Request, res: Response) => {
           amount: liabilityAmount,
           dueDate: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
         });
-        await newLiability.save();
 
-        project.liabilities.push(newLiability._id);
-        await project.save();
+        newLiabilityId = newLiability._id;
+        promises.push(newLiability.save());
       }
     }
 
-    // 5. Add DPR to project
-    project.dprs.push(newDPR._id);
-    await project.save();
+    // Execute parallel updates
+    await Promise.all(promises);
+
+    // 5. Add DPR (and liability if created) to project in one atomic update
+    // OPTIMIZATION: Consolidate multiple project saves into one updateOne
+    const projectUpdate: any = { $push: { dprs: newDPR._id } };
+    if (newLiabilityId) {
+      projectUpdate.$push.liabilities = newLiabilityId;
+    }
+    await Project.updateOne({ _id: projectId }, projectUpdate);
 
     res.status(201).json({
       success: true,
@@ -76,8 +99,9 @@ export const createDPR = async (req: Request, res: Response) => {
     });
 
   } catch (error: any) {
-    console.error(error);
-    res.status(500).json({ error: error.message });
+    // Log error for server-side observability and return generic message
+    console.error(`[createDPR] Error:`, error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
