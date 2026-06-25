@@ -42,6 +42,13 @@ const SiteExecution: React.FC = () => {
         )}
       </div>
 
+      <DocumentManager
+        projectId={projectId}
+        documents={data?.documents || []}
+        onAddDocument={(doc) => api.addDocument(projectId, doc)}
+        filterModule="EXECUTION"
+      />
+
       {/* Rest of your original SiteExecution UI remains exactly the same */}
       {/* Just make sure all action buttons check currentRole before showing */}
 
