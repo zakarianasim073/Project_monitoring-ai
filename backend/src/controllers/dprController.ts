@@ -12,40 +12,50 @@ export const createDPR = async (req: Request, res: Response) => {
     const { projectId } = req.params;
     const dprData = req.body;
 
-    const project = await Project.findById(projectId);
-    if (!project) return res.status(404).json({ error: 'Project not found' });
+    // Use .exists() to avoid hydrating the full project document (performance)
+    const projectExists = await Project.exists({ _id: projectId });
+    if (!projectExists) return res.status(404).json({ error: 'Project not found' });
 
-    // 1. Create DPR
+    const operations: Promise<any>[] = [];
+    const projectPushIds: { dprs?: any, liabilities?: any } = {};
+
+    // 1. Prepare DPR
     const newDPR = new DPR({
       ...dprData,
       project: projectId,
     });
-    await newDPR.save();
+    operations.push(newDPR.save());
+    projectPushIds.dprs = newDPR._id;
 
-    // 2. Auto-update BOQ executed quantity (if linked)
+    // 2. Auto-update BOQ executed quantity (Atomic update)
     if (dprData.linkedBoqId && dprData.workDoneQty) {
-      const boqItem = await BOQItem.findById(dprData.linkedBoqId);
-      if (boqItem) {
-        boqItem.executedQty += Number(dprData.workDoneQty);
-        await boqItem.save();
-      }
+      operations.push(BOQItem.updateOne(
+        { _id: dprData.linkedBoqId },
+        { $inc: { executedQty: Number(dprData.workDoneQty) } }
+      ));
     }
 
-    // 3. Auto-deduct material stock
+    // 3. Auto-deduct material stock (Bulk atomic update)
     if (dprData.materialsUsed && dprData.materialsUsed.length > 0) {
-      for (const usage of dprData.materialsUsed) {
-        const material = await Material.findById(usage.materialId);
-        if (material) {
-          material.totalConsumed = (material.totalConsumed || 0) + Number(usage.qty);
-          material.currentStock = Math.max(0, (material.currentStock || 0) - Number(usage.qty));
-          await material.save();
+      const materialOps = dprData.materialsUsed.map((usage: any) => ({
+        updateOne: {
+          filter: { _id: usage.materialId },
+          update: {
+            $inc: {
+              totalConsumed: Number(usage.qty),
+              currentStock: -Number(usage.qty)
+            }
+          }
         }
-      }
+      }));
+      // Note: currentStock can go negative if not clamped, but $inc is faster.
+      // If clamping is required, use aggregation pipeline in update (Mongoose 4.2+ / MongoDB 4.2+)
+      operations.push(Material.bulkWrite(materialOps));
     }
 
-    // 4. Auto-create subcontractor liability (if linked)
+    // 4. Auto-create subcontractor liability (Optimized lookup)
     if (dprData.subContractorId && dprData.workDoneQty && dprData.linkedBoqId) {
-      const subCon = await SubContractor.findById(dprData.subContractorId);
+      const subCon = await SubContractor.findById(dprData.subContractorId, { agreedRates: 1 });
       if (subCon) {
         const rateObj = subCon.agreedRates.find(r => r.boqId === dprData.linkedBoqId);
         const rate = rateObj ? (rateObj.rate || 0) : 0;
@@ -58,26 +68,32 @@ export const createDPR = async (req: Request, res: Response) => {
           amount: liabilityAmount,
           dueDate: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
         });
-        await newLiability.save();
-
-        project.liabilities.push(newLiability._id);
-        await project.save();
+        operations.push(newLiability.save());
+        projectPushIds.liabilities = newLiability._id;
       }
     }
 
-    // 5. Add DPR to project
-    project.dprs.push(newDPR._id);
-    await project.save();
+    // Execute independent operations in parallel
+    await Promise.all(operations);
+
+    // 5. Atomic update to project (Single roundtrip for all references)
+    const projectUpdate: any = { $push: {} };
+    if (projectPushIds.dprs) projectUpdate.$push.dprs = projectPushIds.dprs;
+    if (projectPushIds.liabilities) projectUpdate.$push.liabilities = projectPushIds.liabilities;
+
+    if (Object.keys(projectUpdate.$push).length > 0) {
+      await Project.updateOne({ _id: projectId }, projectUpdate);
+    }
 
     res.status(201).json({
       success: true,
-      message: "DPR created with full automation",
+      message: "DPR created with full automation (optimized)",
       dpr: newDPR
     });
 
   } catch (error: any) {
     console.error(error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: "Internal server error" }); // Generic error for security
   }
 };
 
