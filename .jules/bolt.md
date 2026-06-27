@@ -1,3 +1,7 @@
 ## 2025-05-15 - Optimizing Bill Creation and BOQ Distribution
 **Learning:** The `Project` model in this application acts as a root aggregate with many large sub-document arrays. Using `findById` triggers full hydration of these arrays, which is inefficient for simple existence checks. Additionally, updating BOQ items in a loop with `.save()` creates an N+1 query problem, significantly slowing down bill processing as the number of BOQ items grows.
 **Action:** Use `Model.exists()` for presence validation and `updateMany` with atomic operators like `$inc` for bulk updates to eliminate N+1 overhead and minimize database roundtrips.
+
+## 2026-06-24 - Remediating Recurring Performance Regressions in createDPR
+**Learning:** Optimized atomic operations (hydration avoidance, parallelization, and bulk updates) are prone to regression when subsequent changes revert to sequential `findById` and `.save()` patterns. These regressions not only degrade performance but often strip away BOLA protections. MongoDB aggregation pipelines in updates allow for atomic, conditional arithmetic (e.g., using `$max` for clamping) directly in the database, eliminating race conditions and the need for sequential read-modify-write logic.
+**Action:** Always prioritize atomic operators (`$inc`, `$push`, `$set` with aggregation) and `bulkWrite` for multi-record updates. Consolidate related sub-document updates into a single `Project.updateOne` call.
