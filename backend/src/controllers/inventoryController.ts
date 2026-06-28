@@ -7,24 +7,39 @@ export const receiveMaterial = async (req: Request, res: Response) => {
     const { projectId } = req.params;
     const { materialId, qty, rate } = req.body;
 
-    const project = await Project.findById(projectId);
-    if (!project) return res.status(404).json({ error: 'Project not found' });
+    // BOLT OPTIMIZATION: Use .exists() to avoid hydrating large project arrays
+    const projectExists = await Project.exists({ _id: projectId });
+    if (!projectExists) return res.status(404).json({ error: 'Project not found' });
 
-    const material = await Material.findById(materialId);
+    // BOLT OPTIMIZATION: Atomic update using aggregation pipeline to fix race conditions
+    // and correct weighted average calculation in a single DB roundtrip.
+    const material = await Material.findOneAndUpdate(
+      { _id: materialId },
+      [
+        {
+          $set: {
+            // Correctly calculate averageRate using current (old) totalReceived before updating it
+            averageRate: {
+              $cond: [
+                { $gt: [Number(rate || 0), 0] },
+                {
+                  $divide: [
+                    { $add: [{ $multiply: ["$averageRate", "$totalReceived"] }, { $multiply: [Number(rate), Number(qty)] }] },
+                    { $add: ["$totalReceived", Number(qty)] }
+                  ]
+                },
+                "$averageRate"
+              ]
+            },
+            totalReceived: { $add: ["$totalReceived", Number(qty)] },
+            currentStock: { $add: ["$currentStock", Number(qty)] }
+          }
+        }
+      ],
+      { new: true }
+    );
+
     if (!material) return res.status(404).json({ error: 'Material not found' });
-
-    // Update stock
-    material.totalReceived += Number(qty);
-    material.currentStock += Number(qty);
-    
-    if (rate) {
-      // Update average rate (weighted average)
-      const oldTotalValue = material.averageRate * material.totalReceived;
-      const newTotalValue = oldTotalValue + (Number(rate) * Number(qty));
-      material.averageRate = newTotalValue / material.totalReceived;
-    }
-
-    await material.save();
 
     res.json({
       success: true,
