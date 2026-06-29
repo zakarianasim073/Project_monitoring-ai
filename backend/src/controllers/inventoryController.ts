@@ -7,29 +7,40 @@ export const receiveMaterial = async (req: Request, res: Response) => {
     const { projectId } = req.params;
     const { materialId, qty, rate } = req.body;
 
-    const project = await Project.findById(projectId);
-    if (!project) return res.status(404).json({ error: 'Project not found' });
+    const projectExists = await Project.exists({ _id: projectId });
+    if (!projectExists) return res.status(404).json({ error: 'Project not found' });
 
-    const material = await Material.findById(materialId);
-    if (!material) return res.status(404).json({ error: 'Material not found' });
+    // Atomic update for stock and weighted average rate
+    const updatedMaterial = await Material.findOneAndUpdate(
+      { _id: materialId },
+      [
+        {
+          $set: {
+            totalReceived: { $add: ["$totalReceived", Number(qty)] },
+            currentStock: { $add: ["$currentStock", Number(qty)] },
+            averageRate: rate ? {
+              $divide: [
+                {
+                  $add: [
+                    { $multiply: ["$averageRate", "$totalReceived"] },
+                    { $multiply: [Number(rate), Number(qty)] }
+                  ]
+                },
+                { $add: ["$totalReceived", Number(qty)] }
+              ]
+            } : "$averageRate"
+          }
+        }
+      ],
+      { new: true }
+    );
 
-    // Update stock
-    material.totalReceived += Number(qty);
-    material.currentStock += Number(qty);
-    
-    if (rate) {
-      // Update average rate (weighted average)
-      const oldTotalValue = material.averageRate * material.totalReceived;
-      const newTotalValue = oldTotalValue + (Number(rate) * Number(qty));
-      material.averageRate = newTotalValue / material.totalReceived;
-    }
-
-    await material.save();
+    if (!updatedMaterial) return res.status(404).json({ error: 'Material not found' });
 
     res.json({
       success: true,
-      message: `Received ${qty} ${material.unit} of ${material.name}`,
-      material
+      message: `Received ${qty} ${updatedMaterial.unit} of ${updatedMaterial.name}`,
+      material: updatedMaterial
     });
 
   } catch (error: any) {
