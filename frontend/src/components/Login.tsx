@@ -8,6 +8,11 @@ const Login: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
+  const fillDemoCredentials = (demoEmail: string) => {
+    setEmail(demoEmail);
+    setPassword('123456');
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -84,9 +89,25 @@ const Login: React.FC = () => {
           </form>
 
           <div className="mt-8 text-center text-xs text-slate-500">
-            Demo Accounts:<br />
-            director@buildtrack.bd / 123456<br />
-            engineer@buildtrack.bd / 123456
+            <p className="mb-2">Demo Accounts (click to auto-fill):</p>
+            <div className="flex flex-wrap justify-center gap-2">
+              <button
+                type="button"
+                onClick={() => fillDemoCredentials('director@buildtrack.bd')}
+                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors border border-slate-200"
+                aria-label="Use Director demo account"
+              >
+                Director
+              </button>
+              <button
+                type="button"
+                onClick={() => fillDemoCredentials('engineer@buildtrack.bd')}
+                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors border border-slate-200"
+                aria-label="Use Engineer demo account"
+              >
+                Engineer
+              </button>
+            </div>
           </div>
         </div>
       </div>
