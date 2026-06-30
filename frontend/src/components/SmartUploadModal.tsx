@@ -8,6 +8,14 @@ const SmartUploadModal = ({ projectId, isOpen, onClose, onSuccess }: any) => {
   const closeBtnRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
+    if (isOpen) {
+      setFile(null);
+      setResult(null);
+      setProcessing(false);
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
       if (e.key === 'Tab' && isOpen) {
@@ -87,7 +95,13 @@ const SmartUploadModal = ({ projectId, isOpen, onClose, onSuccess }: any) => {
               <CheckCircle2 className="w-12 h-12 text-emerald-600" />
             </div>
             <h3 className="text-xl font-bold text-slate-900 mb-2">Import Successful!</h3>
-            <p className="text-slate-500">AI has processed your document and updated the project.</p>
+            <p className="text-slate-500 mb-8">AI has processed your document and updated the project.</p>
+            <button
+              onClick={onClose}
+              className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-colors"
+            >
+              Done
+            </button>
           </div>
         ) : (
           <>
