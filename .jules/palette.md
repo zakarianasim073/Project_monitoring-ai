@@ -1,0 +1,3 @@
+## 2026-06-30 - Standardizing Modal UX and Accessibility
+**Learning:** Modern accessible modals require more than just a close button. Implementing the 'Standard Modal Trio' (X button, Escape key, backdrop click) combined with focus management (initial focus and focus trap) and correct ARIA roles (dialog, aria-modal) is essential for both keyboard and screen reader users. Additionally, providing a clear success state UI within the modal itself (instead of just closing it) improves user feedback and confidence in asynchronous operations.
+**Action:** Always implement focus traps and initial focus for modals. Use `focus-visible` for interaction rings. Ensure ARIA roles are placed on the content container, not the backdrop.
