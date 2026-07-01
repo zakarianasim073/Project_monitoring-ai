@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { useParams, Outlet, Navigate } from 'react-router-dom';
+import { useParams, Outlet, Navigate, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, FileText, HardHat, DollarSign, AlertTriangle, FolderOpen, Menu, X, ChevronLeft, UserCircle } from 'lucide-react';
 import { UserRole } from '../types';
 
 const Layout: React.FC = () => {
   const { projectId } = useParams();
+  const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('dashboard');
 
@@ -40,7 +41,10 @@ const Layout: React.FC = () => {
           {navItems.map(item => (
             <button
               key={item.id}
-              onClick={() => setActiveTab(item.id)}
+              onClick={() => {
+                setActiveTab(item.id);
+                navigate(`/project/${projectId}/${item.id === 'dashboard' ? '' : item.id}`);
+              }}
               className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl transition-all ${activeTab === item.id ? 'bg-blue-600 text-white' : 'hover:bg-slate-100'}`}
             >
               <item.icon className="w-5 h-5" />
