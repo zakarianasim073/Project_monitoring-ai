@@ -1,0 +1,4 @@
+## 2024-05-20 - Broken Object Level Authorization (BOLA) in Project Controllers
+**Vulnerability:** Several controllers (inventory, DPR, costing) were using `findById(id)` to retrieve documents (Material, BOQItem, SubContractor, Bill) without verifying that the document actually belongs to the project being accessed (identified by `projectId` in the URL). An authenticated user could potentially modify or access items from other projects by guessing or obtaining their IDs.
+**Learning:** Authenticated routes often rely on top-level authorization (e.g., "is the user a member of this project?"), but fail to enforce that every sub-resource lookup also validates ownership or association with the parent resource.
+**Prevention:** Always include the parent resource ID (e.g., `project`) in the query when retrieving sub-resources by ID: `Model.findOne({ _id: id, project: projectId })`.
