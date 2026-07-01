@@ -3,6 +3,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Login from './components/Login';
 import ProjectList from './components/ProjectList';
 import Layout from './components/Layout';
+import Dashboard from './components/Dashboard';
+import SiteExecution from './components/SiteExecution';
+import LiabilityTracker from './components/LiabilityTracker';
 
 const queryClient = new QueryClient();
 
@@ -23,9 +26,15 @@ function App() {
           />
           
           <Route 
-            path="/project/:projectId/*" 
-            element={token ? <Layout /> : <Navigate to="/login" />} 
-          />
+            path="/project/:projectId"
+            element={token ? <Layout /> : <Navigate to="/login" />}
+          >
+            <Route index element={<Dashboard />} />
+            <Route path="dashboard" element={<Dashboard />} />
+            <Route path="site" element={<SiteExecution />} />
+            <Route path="liability" element={<LiabilityTracker />} />
+            <Route path="documents" element={<SiteExecution />} /> {/* Fallback or specific Document component if exists */}
+          </Route>
 
           {/* Redirect root */}
           <Route path="/" element={<Navigate to={token ? "/projects" : "/login"} />} />
