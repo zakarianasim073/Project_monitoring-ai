@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 
 const SubContractorSchema = new mongoose.Schema({
-  project: { type: mongoose.Schema.Types.ObjectId, ref: 'Project', required: true },
+  project: { type: mongoose.Schema.Types.ObjectId, ref: 'Project', required: true, index: true },
   name: { type: String, required: true },
   specialization: String,
   totalWorkValue: { type: Number, default: 0 },

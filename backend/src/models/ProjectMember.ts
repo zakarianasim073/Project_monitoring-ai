@@ -10,4 +10,6 @@ const ProjectMemberSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
+ProjectMemberSchema.index({ user: 1, project: 1 });
+
 export const ProjectMember = mongoose.model('ProjectMember', ProjectMemberSchema);

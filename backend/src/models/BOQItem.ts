@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 
 const BOQItemSchema = new mongoose.Schema({
-  project: { type: mongoose.Schema.Types.ObjectId, ref: 'Project', required: true },
+  project: { type: mongoose.Schema.Types.ObjectId, ref: 'Project', required: true, index: true },
   id: { type: String, required: true }, // e.g. "BOQ-001"
   description: { type: String, required: true },
   plannedQty: { type: Number, required: true },
