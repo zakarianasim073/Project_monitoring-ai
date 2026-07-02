@@ -7,10 +7,8 @@ export const receiveMaterial = async (req: Request, res: Response) => {
     const { projectId } = req.params;
     const { materialId, qty, rate } = req.body;
 
-    const project = await Project.findById(projectId);
-    if (!project) return res.status(404).json({ error: 'Project not found' });
-
-    const material = await Material.findById(materialId);
+    // OPTIMIZATION: Removed redundant Project.findById as existence is verified by requireProjectRole middleware
+    const material = await Material.findOne({ _id: materialId, project: projectId });
     if (!material) return res.status(404).json({ error: 'Material not found' });
 
     // Update stock

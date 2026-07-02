@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 
 const BillSchema = new mongoose.Schema({
-  project: { type: mongoose.Schema.Types.ObjectId, ref: 'Project', required: true },
+  project: { type: mongoose.Schema.Types.ObjectId, ref: 'Project', required: true, index: true },
   type: { 
     type: String, 
     enum: ['CLIENT_RA', 'VENDOR_INVOICE', 'MATERIAL_EXPENSE', 'SUB_CONTRACTOR'], 
