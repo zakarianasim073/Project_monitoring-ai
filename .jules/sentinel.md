@@ -1,0 +1,4 @@
+## 2026-06-12 - Atomic Material Updates and BOLA Protection
+**Vulnerability:** Broken Object Level Authorization (BOLA) in `inventoryController.ts` allowed any authenticated user with project access to potentially modify any Material, SubContractor, or Bill if they knew the document ID, as lookups were not scoped to the project.
+**Learning:** Using `findById` and then saving (fetch-then-save) is not only slower but also creates race conditions for incrementing values like stock and total received. Additionally, calculating weighted averages in application logic *after* incrementing totals leads to incorrect valuation formulas.
+**Prevention:** Always use `findOneAndUpdate` or `updateOne` with filters that include both the document `_id` and the `project` ID. For calculations, use aggregation pipelines within the update to ensure atomicity and correct reference to pre-update field values.
