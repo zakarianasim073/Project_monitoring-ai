@@ -31,6 +31,7 @@ jobs:
     - name: Build Frontend
       run: |
         cd frontend
-        npm install -g pnpm
+        # Bolt: Pinning pnpm to v9 to avoid ERR_PNPM_IGNORED_BUILDS on Node 22+ (pnpm 10 behavior)
+        npm install -g pnpm@9
         pnpm install
         pnpm run build
