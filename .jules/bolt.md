@@ -1,3 +1,7 @@
 ## 2025-05-15 - Optimizing Bill Creation and BOQ Distribution
 **Learning:** The `Project` model in this application acts as a root aggregate with many large sub-document arrays. Using `findById` triggers full hydration of these arrays, which is inefficient for simple existence checks. Additionally, updating BOQ items in a loop with `.save()` creates an N+1 query problem, significantly slowing down bill processing as the number of BOQ items grows.
 **Action:** Use `Model.exists()` for presence validation and `updateMany` with atomic operators like `$inc` for bulk updates to eliminate N+1 overhead and minimize database roundtrips.
+
+## 2026-07-04 - Optimizing the DPR Creation Flow
+**Learning:** The DPR creation flow was highly inefficient, performing approximately (N+M+5) sequential database roundtrips for a single request (where N is the number of materials used and M is for links). This was caused by sequential `findById` and `.save()` calls on various models (DPR, BOQItem, Material, Liability, Project), which also triggered full hydration of large root aggregate arrays in the `Project` model.
+**Action:** Parallelized dependency checks and document saves using `Promise.all`. Replaced sequential material updates with a single `Material.bulkWrite` using an aggregation pipeline to handle stock deduction and clamping atomically. Pre-generated ObjectIDs for new documents allowed parallelizing their creation with the final atomic `Project.updateOne`, which avoids the overhead of hydrating and re-saving the entire project document.
