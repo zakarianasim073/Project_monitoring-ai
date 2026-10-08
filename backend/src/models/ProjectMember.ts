@@ -10,4 +10,7 @@ const ProjectMemberSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
+// Optimize lookups by user and project (used in auth middleware and project lists)
+ProjectMemberSchema.index({ user: 1, project: 1 });
+
 export const ProjectMember = mongoose.model('ProjectMember', ProjectMemberSchema);

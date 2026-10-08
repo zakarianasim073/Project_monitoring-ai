@@ -49,11 +49,14 @@ router.post(
 router.get('/my-projects', protect, async (req, res) => {
   try {
     const { ProjectMember } = await import('../models/ProjectMember');
+    // Use .lean() to return plain JS objects and avoid .toObject() later
     const members = await ProjectMember.find({ user: (req as any).user._id })
-      .populate('project', 'name contractValue startDate endDate status priority');
+      .populate('project', 'name contractValue startDate endDate status priority')
+      .lean();
 
     const projects = members.map((m: any) => ({
-      ...m.project.toObject(),
+      ...(m.project),
+      id: m.project?._id,
       myRole: m.role
     }));
 
@@ -67,6 +70,7 @@ router.get('/my-projects', protect, async (req, res) => {
 router.get('/:projectId', protect, requireProjectRole(['DIRECTOR', 'MANAGER', 'ENGINEER', 'ACCOUNTANT']), async (req, res) => {
   try {
     const { Project } = await import('../models/Project');
+    // Massive performance gain by using .lean() on this heavily-populated query
     const project = await Project.findById(req.params.projectId)
       .populate('boq')
       .populate('dprs')
@@ -74,11 +78,25 @@ router.get('/:projectId', protect, requireProjectRole(['DIRECTOR', 'MANAGER', 'E
       .populate('subContractors')
       .populate('bills')
       .populate('liabilities')
-      .populate('documents');
+      .populate('documents')
+      .lean();
 
     if (!project) return res.status(404).json({ error: 'Project not found' });
 
-    res.json(project);
+    // Map _id to id for frontend compatibility since .lean() skips virtuals
+    const projectWithId = {
+      ...project,
+      id: project._id,
+      boq: project.boq?.map((item: any) => ({ ...item, id: item._id })),
+      dprs: project.dprs?.map((item: any) => ({ ...item, id: item._id })),
+      materials: project.materials?.map((item: any) => ({ ...item, id: item._id })),
+      subContractors: project.subContractors?.map((item: any) => ({ ...item, id: item._id })),
+      bills: project.bills?.map((item: any) => ({ ...item, id: item._id })),
+      liabilities: project.liabilities?.map((item: any) => ({ ...item, id: item._id })),
+      documents: project.documents?.map((item: any) => ({ ...item, id: item._id })),
+    };
+
+    res.json(projectWithId);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
