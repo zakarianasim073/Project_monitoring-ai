@@ -42,8 +42,22 @@ const SiteExecution: React.FC = () => {
         )}
       </div>
 
-      {/* Rest of your original SiteExecution UI remains exactly the same */}
-      {/* Just make sure all action buttons check currentRole before showing */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 space-y-8">
+          <div className="bg-white p-8 rounded-3xl border border-slate-200">
+            <h3 className="text-xl font-bold mb-4">Daily Progress Reports</h3>
+            <p className="text-slate-500">Track daily activities and resource utilization.</p>
+          </div>
+        </div>
+
+        <div className="space-y-8">
+          <DocumentManager
+            documents={data?.documents || []}
+            onAddDocument={() => {}}
+            filterModule="SITE"
+          />
+        </div>
+      </div>
 
       {/* DPR Modal, Receive Modal, etc. — keep your beautiful UI */}
     </div>
