@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { useParams, Outlet, Navigate } from 'react-router-dom';
+import { useParams, Outlet, Navigate, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, FileText, HardHat, DollarSign, AlertTriangle, FolderOpen, Menu, X, ChevronLeft, UserCircle } from 'lucide-react';
 import { UserRole } from '../types';
 
 const Layout: React.FC = () => {
   const { projectId } = useParams();
+  const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('dashboard');
 
@@ -27,6 +28,14 @@ const Layout: React.FC = () => {
       <aside className="hidden lg:block w-72 bg-white border-r h-screen fixed">
         {/* Logo + Project Info */}
         <div className="p-6 border-b">
+          <button
+            onClick={() => navigate('/projects')}
+            className="flex items-center gap-2 text-slate-500 hover:text-blue-600 transition-colors mb-6 group"
+            aria-label="Back to Projects list"
+          >
+            <ChevronLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
+            <span className="text-sm font-medium">Back to Projects</span>
+          </button>
           <div className="flex items-center gap-3 mb-6">
             <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-bold text-2xl">B</div>
             <div>
