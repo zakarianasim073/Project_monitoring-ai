@@ -1,0 +1,3 @@
+## 2026-06-20 - [Accessible Role Switcher & Component Lifecycle Fixes]
+**Learning:** Hover-based dropdowns are prone to regression and poor accessibility; state-controlled click-based dropdowns with `useRef` for outside-click detection and `Escape` key handling provide a more robust and inclusive experience. Additionally, floating JSX fragments in source files (likely from copy-paste errors) break builds and should be audited during UX cleanup.
+**Action:** Always prefer click-triggered menus over hover-based ones for critical navigation/role switching, and ensure components receive necessary context (like `projectId`) through props to maintain functional integrity.

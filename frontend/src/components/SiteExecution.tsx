@@ -2,7 +2,6 @@ import React, { useState, useMemo } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { ProjectState, DPR, MaterialConsumption, UserRole } from '../types';
 import { api } from '../services/api';
-import DocumentManager from './DocumentManager';
 import { MapPin, Users, Calendar, PlusCircle, X, ClipboardCheck, Lock, Sparkles, Loader2, FileText, CheckCircle2, Package, ArrowDownLeft, Edit2, Save, HardHat } from 'lucide-react';
 
 const SiteExecution: React.FC = () => {
