@@ -166,6 +166,7 @@ router.post(
 router.post(
   '/:projectId/ai/insights', 
   protect, 
+  requireProjectRole(['DIRECTOR', 'MANAGER', 'ENGINEER', 'ACCOUNTANT']),
   async (req, res) => {
     try {
       const { Project } = await import('../models/Project');
@@ -175,7 +176,7 @@ router.post(
       const insight = await geminiService.generateProjectInsights(project);
       res.json({ insight });
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: 'Internal server error' });
     }
   }
 );
