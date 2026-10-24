@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { ProjectState, UserRole } from '../types';
 import { AlertTriangle, Clock, Lock } from 'lucide-react';
@@ -28,6 +28,7 @@ const LiabilityTracker: React.FC = () => {
       </div>
 
       <DocumentManager 
+        projectId={projectId}
         documents={data?.documents || []} 
         onAddDocument={(doc) => api.addDocument(projectId, doc)}
         filterModule="LIABILITY" 

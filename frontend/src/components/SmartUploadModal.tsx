@@ -1,11 +1,21 @@
-import React, { useState } from 'react';
-import { UploadCloud, Loader2, Sparkles, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { UploadCloud, Loader2, Sparkles, CheckCircle2, X } from 'lucide-react';
 import { api } from '../services/api';
 
 const SmartUploadModal = ({ projectId, isOpen, onClose, onSuccess }: any) => {
   const [file, setFile] = useState<File | null>(null);
   const [processing, setProcessing] = useState(false);
   const [result, setResult] = useState<any>(null);
+
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    if (isOpen) {
+      document.addEventListener('keydown', handleEscape);
+    }
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [isOpen, onClose]);
 
   const handleSmartUpload = async () => {
     if (!file) return;
@@ -38,13 +48,30 @@ const SmartUploadModal = ({ projectId, isOpen, onClose, onSuccess }: any) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80">
-      <div className="bg-white rounded-3xl w-full max-w-md p-8">
-        <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-3xl w-full max-w-md p-8 relative"
+        onClick={e => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modal-title"
+      >
+        <button
+          onClick={onClose}
+          className="absolute right-6 top-6 text-slate-400 hover:text-slate-600 transition-colors"
+          aria-label="Close modal"
+        >
+          <X className="w-6 h-6" />
+        </button>
+
+        <h2 id="modal-title" className="text-2xl font-bold mb-6 flex items-center gap-3">
           <Sparkles className="text-emerald-600" /> Smart Document Import
         </h2>
 
-        <div className="border-2 border-dashed rounded-2xl p-10 text-center">
+        <div className="border-2 border-dashed rounded-2xl p-10 text-center hover:border-emerald-500 transition-colors focus-within:ring-2 focus-within:ring-emerald-500 focus-within:ring-offset-2">
           <input type="file" accept=".pdf,.xlsx,.xls,.docx" onChange={e => setFile(e.target.files?.[0] || null)} className="hidden" id="smart-file" />
           <label htmlFor="smart-file" className="cursor-pointer block">
             <UploadCloud className="w-16 h-16 mx-auto text-slate-400 mb-4" />
