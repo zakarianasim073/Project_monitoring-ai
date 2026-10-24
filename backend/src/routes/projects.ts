@@ -166,6 +166,7 @@ router.post(
 router.post(
   '/:projectId/ai/insights', 
   protect, 
+  requireProjectRole(['DIRECTOR', 'MANAGER', 'ENGINEER', 'ACCOUNTANT']),
   async (req, res) => {
     try {
       const { Project } = await import('../models/Project');
