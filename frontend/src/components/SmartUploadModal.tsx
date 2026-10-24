@@ -1,11 +1,21 @@
-import React, { useState } from 'react';
-import { UploadCloud, Loader2, Sparkles, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { UploadCloud, Loader2, Sparkles, CheckCircle2, X } from 'lucide-react';
 import { api } from '../services/api';
 
 const SmartUploadModal = ({ projectId, isOpen, onClose, onSuccess }: any) => {
   const [file, setFile] = useState<File | null>(null);
   const [processing, setProcessing] = useState(false);
   const [result, setResult] = useState<any>(null);
+
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    if (isOpen) {
+      window.addEventListener('keydown', handleEscape);
+    }
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [isOpen, onClose]);
 
   const handleSmartUpload = async () => {
     if (!file) return;
@@ -38,9 +48,26 @@ const SmartUploadModal = ({ projectId, isOpen, onClose, onSuccess }: any) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80">
-      <div className="bg-white rounded-3xl w-full max-w-md p-8">
-        <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-3xl w-full max-w-md p-8 relative"
+        onClick={e => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="smart-upload-title"
+      >
+        <button
+          onClick={onClose}
+          className="absolute right-6 top-6 text-slate-400 hover:text-slate-600 transition-colors"
+          aria-label="Close modal"
+        >
+          <X className="w-6 h-6" />
+        </button>
+
+        <h2 id="smart-upload-title" className="text-2xl font-bold mb-6 flex items-center gap-3">
           <Sparkles className="text-emerald-600" /> Smart Document Import
         </h2>
 
