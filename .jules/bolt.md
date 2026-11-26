@@ -5,3 +5,6 @@
 ## 2025-05-20 - High-Performance DPR Creation Pattern
 **Learning:** In complex controllers like `createDPR` that interact with multiple models (BOQ, Material, Liability), sequential `await` calls and loops for stock updates introduce significant latency. Using `Material.bulkWrite` with aggregation pipelines allows for atomic stock management without fetching documents, and `Promise.all` parallelizes independent operations while `Project.updateOne` with `$push` avoids the overhead of hydrating the massive Project aggregate.
 **Action:** Parallelize independent model operations and use atomic bulk operations (`bulkWrite`, `updateOne` with `$inc` / `$push`) to maximize throughput for aggregate-heavy controllers.
+## 2026-06-12 - Atomic Weighted Average and Inventory Updates
+**Learning:** Atomic aggregation pipelines within `findOneAndUpdate` allow for complex state-dependent calculations (like weighted averages) and multiple field updates in a single database roundtrip. This ensures race-condition safety and eliminates the overhead of document hydration required by the fetch-then-save pattern.
+**Action:** Prefer `findOneAndUpdate` with aggregation pipelines over fetch-then-save for updates that involve calculations referencing current document fields.
